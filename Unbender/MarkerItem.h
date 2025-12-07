@@ -13,19 +13,19 @@ public:
         Square,
         Triangle
     };
-    MarkerItem(QPointF center, MarkerShape shape = Circle, qreal size = 10.0, QColor color = Qt::red);
+    MarkerItem(QPointF center, MarkerShape shape = Circle, qreal size = 10.0, QColor colour = Qt::red);
 
     QRectF boundingRect() const override;
     void paint(QPainter *painter, const QStyleOptionGraphicsItem *, QWidget *) override;
 
     void setShape(MarkerShape shape);
     void setSize(qreal size);
-    void setColor(QColor color);
+    void setColor(QColor colour);
 
 private:
     MarkerShape m_shape;
     qreal m_size;
-    QColor m_color;
+    QColor m_colour;
 
 };
 

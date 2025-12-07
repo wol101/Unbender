@@ -4,6 +4,8 @@
 #include <QGraphicsView>
 
 class QWheelEvent;
+class QMouseEvent;
+class QKeyEvent;
 class MarkerItem;
 
 class GraphicsView : public QGraphicsView
@@ -16,13 +18,12 @@ protected:
     void mousePressEvent(QMouseEvent *event) override;
     void mouseMoveEvent(QMouseEvent *event) override;
     void mouseReleaseEvent(QMouseEvent *event) override;
+    void keyPressEvent(QKeyEvent* event) override;
 
 private:
-    // bool drawing;
-    // QPointF startPoint;
-    // QGraphicsLineItem *currentLine = 0;
     MarkerItem *m_cursor = 0;
-
+    MarkerItem *m_position1 = 0;
+    MarkerItem *m_position2 = 0;
 };
 
 #endif // GRAPHICSVIEW_H

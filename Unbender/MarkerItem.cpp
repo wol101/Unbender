@@ -1,9 +1,9 @@
 #include "MarkerItem.h"
 
-MarkerItem::MarkerItem(QPointF center, MarkerShape shape, qreal size, QColor color)
-    : m_shape(shape), m_size(size), m_color(color)
+MarkerItem::MarkerItem(QPointF centre, MarkerShape shape, qreal size, QColor colour)
+    : m_shape(shape), m_size(size), m_colour(colour)
 {
-    setPos(center); // position in scene coordinates
+    setPos(centre); // position in scene coordinates
 }
 
 QRectF MarkerItem::boundingRect() const
@@ -14,7 +14,7 @@ QRectF MarkerItem::boundingRect() const
 void MarkerItem::paint(QPainter *painter, const QStyleOptionGraphicsItem *, QWidget *)
 {
     painter->setRenderHint(QPainter::Antialiasing);
-    painter->setPen(QPen(m_color, 2));
+    painter->setPen(QPen(m_colour, 2));
     painter->setBrush(Qt::NoBrush);
 
     switch (m_shape)
@@ -41,6 +41,6 @@ void MarkerItem::paint(QPainter *painter, const QStyleOptionGraphicsItem *, QWid
 
 void MarkerItem::setShape(MarkerShape shape) { m_shape = shape; update(); }
 void MarkerItem::setSize(qreal size) { m_size = size; prepareGeometryChange(); }
-void MarkerItem::setColor(QColor color) { m_color = color; update(); }
+void MarkerItem::setColor(QColor colour) { m_colour = colour; update(); }
 
 

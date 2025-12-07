@@ -2,7 +2,9 @@
 #include "MarkerItem.h"
 
 #include <QWheelEvent>
-#include <QGraphicsItem.h>
+#include <QGraphicsItem>
+#include <QMainWindow>
+#include <QStatusBar>
 
 GraphicsView::GraphicsView(QGraphicsScene *scene, QWidget *parent) : QGraphicsView(scene, parent)
 {
@@ -30,14 +32,23 @@ void GraphicsView::mousePressEvent(QMouseEvent *event)
 {
     if (event->button() == Qt::LeftButton)
     {
-        QPointF center = mapToScene(event->pos());
-        if (!m_cursor)
+        if (this->items().size() > 0)
         {
-            MarkerItem::MarkerShape shape = MarkerItem::Cross;
-            qreal size = 10.0;
-            QColor color = Qt::red;
-            m_cursor = new MarkerItem(center, shape, size, color);
-            scene()->addItem(m_cursor);
+            QPointF centre = mapToScene(event->pos());
+            if (!m_cursor)
+            {
+                MarkerItem::MarkerShape shape = MarkerItem::Cross;
+                qreal size = 10.0;
+                QColor colour = Qt::red;
+                m_cursor = new MarkerItem(centre, shape, size, colour);
+                scene()->addItem(m_cursor);
+            }
+            else
+            {
+                m_cursor->setPos(centre);
+            }
+            QMainWindow* mainWin = qobject_cast<QMainWindow*>(this->window());
+            if (mainWin) { mainWin->statusBar()->showMessage(QString("Cursor x = %1 y = %2").arg(m_cursor->pos().x()).arg(m_cursor->pos().y()), 10000); } // timeout is 10s
         }
    }
 }
@@ -52,3 +63,51 @@ void GraphicsView::mouseReleaseEvent(QMouseEvent *event)
     {
     }
 }
+
+void GraphicsView::keyPressEvent(QKeyEvent* event)
+{
+    while (true)
+    {
+        if (event->key() == Qt::Key_1)
+        {
+            if (!m_cursor) break;
+            if (!m_position1)
+            {
+                MarkerItem::MarkerShape shape = MarkerItem::Circle;
+                qreal size = 10.0;
+                QColor colour = Qt::green;
+                m_position1 = new MarkerItem(m_cursor->pos(), shape, size, colour);
+                scene()->addItem(m_position1);
+            }
+            else
+            {
+                m_position1->setPos(m_cursor->pos());
+            }
+            QMainWindow* mainWin = qobject_cast<QMainWindow*>(this->window());
+            if (mainWin) { mainWin->statusBar()->showMessage(QString("Position 1 x = %1 y = %2").arg(m_position1->pos().x()).arg(m_position1->pos().y()), 10000); }
+            break;
+        }
+        if (event->key() == Qt::Key_2)
+        {
+            if (!m_cursor) break;
+            if (!m_position2)
+            {
+                MarkerItem::MarkerShape shape = MarkerItem::Circle;
+                qreal size = 10.0;
+                QColor colour = Qt::blue;
+                m_position2 = new MarkerItem(m_cursor->pos(), shape, size, colour);
+                scene()->addItem(m_position2);
+            }
+            else
+            {
+                m_position2->setPos(m_cursor->pos());
+            }
+            QMainWindow* mainWin = qobject_cast<QMainWindow*>(this->window());
+            if (mainWin) { mainWin->statusBar()->showMessage(QString("Position 2 x = %1 y = %2").arg(m_position2->pos().x()).arg(m_position2->pos().y()), 10000); }
+            break;
+        }
+        QGraphicsView::keyPressEvent(event); // Pass to base class
+        break;
+    }
+}
+
