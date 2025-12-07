@@ -12,6 +12,7 @@
 #include <QAction>
 #include <QWheelEvent>
 #include <QSettings>
+#include <QMessageBox>
 
 
 MainWindow::MainWindow(QWidget *parent)
@@ -25,11 +26,13 @@ MainWindow::MainWindow(QWidget *parent)
     setCentralWidget(m_view);
 
     connect(m_ui->actionOpen, &QAction::triggered, this, &MainWindow::openImage);
+    connect(m_ui->actionStraighten, &QAction::triggered, this, &MainWindow::straighten);
     connect(m_ui->actionQuit, &QAction::triggered, this, &MainWindow::close);
 
     setWindowTitle("Image Viewer");
 
     readSettings();
+    updateUI();
 
 }
 
@@ -37,6 +40,31 @@ MainWindow::~MainWindow()
 {
     writeSettings();
     delete m_ui;
+}
+
+void MainWindow::closeEvent(QCloseEvent *event)
+{
+    if (m_unsavedChanges) {
+        QMessageBox::StandardButton reply;
+        reply = QMessageBox::question(this, "Unsaved Changes", "You have unsaved changes. Do you want to save before quitting?", QMessageBox::Yes | QMessageBox::No | QMessageBox::Cancel);
+
+        if (reply == QMessageBox::Yes)
+        {
+            // Call your save routine
+            saveDocument();
+            event->accept();
+        }
+        else if (reply == QMessageBox::No)
+        {
+            event->accept();  // quit without saving
+        } else {
+            event->ignore();  // cancel close
+        }
+    }
+    else
+    {
+        event->accept();  // no unsaved changes, just quit
+    }
 }
 
 void MainWindow::openImage()
@@ -54,6 +82,7 @@ void MainWindow::openImage()
         {
             m_scene->clear();
             m_scene->addPixmap(QPixmap::fromImage(image));
+            m_view->clear();
             m_view->fitInView(m_scene->itemsBoundingRect(), Qt::KeepAspectRatio);
             QImage grayImage = image.convertToFormat(QImage::Format_Grayscale8);
             m_image = std::make_unique<Image<uint8_t>>(image.width(), image.height());
@@ -66,6 +95,23 @@ void MainWindow::openImage()
             }
         }
     }
+    updateUI();
+}
+
+void MainWindow::saveDocument()
+{
+    updateUI();
+}
+
+void MainWindow::straighten()
+{
+    updateUI();
+}
+
+void MainWindow::updateUI()
+{
+    m_ui->actionOpen->setEnabled(true);
+    m_ui->actionStraighten->setEnabled(m_view->position1() && m_view->position2());
 }
 
 void MainWindow::readSettings()

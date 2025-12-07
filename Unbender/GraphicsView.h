@@ -13,6 +13,14 @@ class GraphicsView : public QGraphicsView
 public:
     GraphicsView(QGraphicsScene *scene, QWidget *parent = nullptr);
 
+    void clear();
+
+    MarkerItem *cursor() const;
+
+    MarkerItem *position1() const;
+
+    MarkerItem *position2() const;
+
 protected:
     void wheelEvent(QWheelEvent *event) override;
     void mousePressEvent(QMouseEvent *event) override;

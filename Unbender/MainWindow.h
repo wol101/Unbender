@@ -22,8 +22,15 @@ public:
     MainWindow(QWidget *parent = nullptr);
     ~MainWindow();
 
+    void updateUI();
+
+protected:
+    void closeEvent(QCloseEvent *event) override;
+
 private slots:
     void openImage();
+    void straighten();
+    void saveDocument();
 
 private:
     Ui::MainWindow *m_ui = 0;
@@ -33,7 +40,7 @@ private:
     QString m_filePath;
 
     std::unique_ptr<Image<uint8_t>> m_image;
-
+    bool m_unsavedChanges = false;
 
     void readSettings();
     void writeSettings();

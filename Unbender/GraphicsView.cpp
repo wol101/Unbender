@@ -1,10 +1,11 @@
 #include "GraphicsView.h"
 #include "MarkerItem.h"
+#include "MainWindow.h"
 
 #include <QWheelEvent>
 #include <QGraphicsItem>
-#include <QMainWindow>
 #include <QStatusBar>
+#include <QMainWindow>
 
 GraphicsView::GraphicsView(QGraphicsScene *scene, QWidget *parent) : QGraphicsView(scene, parent)
 {
@@ -47,8 +48,8 @@ void GraphicsView::mousePressEvent(QMouseEvent *event)
             {
                 m_cursor->setPos(centre);
             }
-            QMainWindow* mainWin = qobject_cast<QMainWindow*>(this->window());
-            if (mainWin) { mainWin->statusBar()->showMessage(QString("Cursor x = %1 y = %2").arg(m_cursor->pos().x()).arg(m_cursor->pos().y()), 10000); } // timeout is 10s
+            if (QMainWindow* mainWindow = qobject_cast<QMainWindow*>(this->window())) { mainWindow->statusBar()->showMessage(QString("Cursor x = %1 y = %2").arg(m_cursor->pos().x()).arg(m_cursor->pos().y()), 10000); }
+            if (MainWindow* mainWindow = qobject_cast<MainWindow*>(this->window())) { mainWindow->updateUI(); }
         }
    }
 }
@@ -83,8 +84,8 @@ void GraphicsView::keyPressEvent(QKeyEvent* event)
             {
                 m_position1->setPos(m_cursor->pos());
             }
-            QMainWindow* mainWin = qobject_cast<QMainWindow*>(this->window());
-            if (mainWin) { mainWin->statusBar()->showMessage(QString("Position 1 x = %1 y = %2").arg(m_position1->pos().x()).arg(m_position1->pos().y()), 10000); }
+            if (QMainWindow* mainWindow = qobject_cast<QMainWindow*>(this->window())) { mainWindow->statusBar()->showMessage(QString("Position 1 x = %1 y = %2").arg(m_position1->pos().x()).arg(m_position1->pos().y()), 10000); }
+            if (MainWindow* mainWindow = qobject_cast<MainWindow*>(this->window())) { mainWindow->updateUI(); }
             break;
         }
         if (event->key() == Qt::Key_2)
@@ -102,12 +103,34 @@ void GraphicsView::keyPressEvent(QKeyEvent* event)
             {
                 m_position2->setPos(m_cursor->pos());
             }
-            QMainWindow* mainWin = qobject_cast<QMainWindow*>(this->window());
-            if (mainWin) { mainWin->statusBar()->showMessage(QString("Position 2 x = %1 y = %2").arg(m_position2->pos().x()).arg(m_position2->pos().y()), 10000); }
+            if (QMainWindow* mainWindow = qobject_cast<QMainWindow*>(this->window())) { mainWindow->statusBar()->showMessage(QString("Position 2 x = %1 y = %2").arg(m_position2->pos().x()).arg(m_position2->pos().y()), 10000); }
+            if (MainWindow* mainWindow = qobject_cast<MainWindow*>(this->window())) { mainWindow->updateUI(); }
             break;
         }
         QGraphicsView::keyPressEvent(event); // Pass to base class
         break;
     }
+}
+
+void GraphicsView::clear()
+{
+    m_cursor = 0;
+    m_position1 = 0;
+    m_position2 = 0;
+}
+
+MarkerItem *GraphicsView::position2() const
+{
+    return m_position2;
+}
+
+MarkerItem *GraphicsView::position1() const
+{
+    return m_position1;
+}
+
+MarkerItem *GraphicsView::cursor() const
+{
+    return m_cursor;
 }
 
