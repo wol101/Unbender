@@ -86,13 +86,14 @@ public:
     const std::vector<PixelType> &data() const { return m_data; }
 
     // Use Bresenham’s line algorithm to get the pixel values along a straight line
-    std::vector<PixelAndLocation> linePixels(std::size_t x0, std::size_t y0, std::size_t x1, std::size_t y1) const {
+    std::vector<PixelAndLocation> linePixels(std::size_t x0, std::size_t y0, std::size_t x1, std::size_t y1) const
+    {
+        std::vector<PixelAndLocation> result;
 #ifndef NDEBUG
         if (x0 >= m_width || y0 >= m_height || x1 >= m_width || y1 >= m_height) {
             throw std::out_of_range("Line endpoints out of range");
         }
 #endif
-        std::vector<PixelAndLocation> result;
 
         int64_t dx = std::abs((int)x1 - (int)x0);
         int64_t dy = -std::abs((int)y1 - (int)y0);
@@ -116,21 +117,21 @@ public:
     }
 
     // Use Midpoint Circle Algorithm (Discrete Raster Circle) to get the points
-    std::vector<PixelAndLocation> circleEdgePixels(size_t cx, size_t cy, size_t r, bool sortByAngle = false)
+    std::vector<PixelAndLocation> circleEdgePixels(size_t cx, size_t cy, size_t r, bool sortByAngle = false) const
     {
+        std::vector<PixelAndLocation> result;
 #ifndef NDEBUG
         if (cx + r >= m_width || cy + r >= m_height || cx < r || cy < r) {
             throw std::out_of_range("Circle edges out of range");
         }
 #endif
-        std::vector<PixelAndLocation> result;
         int64_t x = r;
         int64_t y = 0;
         int64_t decisionOver2 = 1 - x;   // decision criterion
 
         while (y <= x)
         {
-            auto addPoint = [&](int px, int py)
+            auto addPoint = [&](size_t px, size_t py)
             {
                 result.push_back(PixelAndLocation{(*this)(px, py), px, py});
             };
@@ -154,13 +155,14 @@ public:
             std::map<double, PixelAndLocation> angleMap;
             for (auto &&it : result)
             {
-                double angle = std::atan2(it->y(), it->x()) + 2 * std::numbers::pi;
-                angleMap[angle] = *it;
+                double angle = std::atan2(it.y, it.x);
+                if (angle < 0) { angle += 2 * std::numbers::pi; }
+                angleMap[angle] = it;
             }
             result.clear();
             for (auto &&it : angleMap)
             {
-                result.push_back(*it);
+                result.push_back(it.second);
            }
         }
         return result;

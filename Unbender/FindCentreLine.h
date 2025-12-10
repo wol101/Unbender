@@ -1,34 +1,30 @@
 #ifndef FINDCENTRELINE_H
 #define FINDCENTRELINE_H
 
-#include <QPoint>
-#include <QImage>
-
-#include <vector>
-#include <map>
+#include "Image.h"
 
 class FindCentreLine
 {
 public:
     FindCentreLine();
 
-    QPoint FindNextCentrePoint();
+    void findEdges();
 
-    static std::vector<QPoint> circleEdgePixels(const QImage& image, int cx, int cy, int r, std::map<double, QRgb> *angleValues);
+    void findTransitions(const std::vector<Image<uint8_t>::PixelAndLocation> &pixelAndLocation);
 
-    void setStartPoint(QPoint newStartPoint);
+    void setStartPoint(Point newStartPoint);
 
-    void setEndPoint(QPoint newEndPoint);
+    void setEndPoint(Point newEndPoint);
 
-    void setImage(const QImage &newImage);
+    void setImage(const Image<uint8_t> *newImage);
 
 private:
-    QImage m_image;
-    QPoint m_startPoint;
-    QPoint m_endPoint;
-    QPoint m_currentPoint;
-    int m_radius = 20;
-    int m_delta = 5;
+    const Image<uint8_t> *m_image;
+    Point m_startPoint;
+    Point m_endPoint;
+    Point m_currentPoint;
+    size_t m_radius = 20;
+    uint8_t m_threshold = 1;
 
 };
 

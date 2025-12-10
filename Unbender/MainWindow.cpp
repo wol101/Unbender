@@ -105,13 +105,15 @@ void MainWindow::saveDocument()
 
 void MainWindow::straighten()
 {
+
+
     updateUI();
 }
 
 void MainWindow::updateUI()
 {
     m_ui->actionOpen->setEnabled(true);
-    m_ui->actionStraighten->setEnabled(m_view->position1() && m_view->position2());
+    m_ui->actionStraighten->setEnabled(m_image && m_view->position1() && m_view->position2());
 }
 
 void MainWindow::readSettings()
