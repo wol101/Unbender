@@ -11,7 +11,7 @@ GraphicsView::GraphicsView(QGraphicsScene *scene, QWidget *parent) : QGraphicsVi
 {
     // setDragMode(QGraphicsView::ScrollHandDrag);
     // setTransformationAnchor(QGraphicsView::AnchorUnderMouse);
-    setMouseTracking(true);
+    setMouseTracking(true); // needed to get mouse move events all the time
 }
 
 void GraphicsView::wheelEvent(QWheelEvent *event)
@@ -63,12 +63,8 @@ void GraphicsView::mouseMoveEvent(QMouseEvent *event)
         QPointF scenePos = mapToScene(event->pos());
         QPointF itemPos  = m_image->mapFromScene(scenePos);
 
-        qDebug() << scenePos;
-
         int x = static_cast<int>(itemPos.x());
         int y = static_cast<int>(itemPos.y());
-
-        qDebug() << "x = " << x << " y = " << y;
 
         // Bounds check
         if (x >= 0 && y >= 0 && x < m_image->pixmap().width() && y < m_image->pixmap().height())

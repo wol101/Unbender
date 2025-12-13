@@ -59,6 +59,7 @@ cv::Mat OpenCVTools::thresholdImage(const cv::Mat &img, uint8_t grey8Threshold)
     cv::Mat thresh, gray8;
 
     // If the image is not already grayscale, convert it
+    // COLOR_BGR2GRAY is weighted luminance formula (ITU‑R BT.601 standard 0.299R + 0.587G + 0.114B)
     if (img.channels() == 3 || img.channels() == 4) { cv::cvtColor(img, gray8, cv::COLOR_BGR2GRAY); }
     else { gray8 = img.clone(); }
 
@@ -68,7 +69,7 @@ cv::Mat OpenCVTools::thresholdImage(const cv::Mat &img, uint8_t grey8Threshold)
     // Ensure it's binary (thresholding if needed)
     cv::threshold(gray8, thresh, grey8Threshold, 255, cv::THRESH_BINARY);
 
-    return thresh;
+    return gray8;
 }
 
 
