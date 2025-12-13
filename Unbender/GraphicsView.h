@@ -19,9 +19,9 @@ public:
 
     void addItem(QGraphicsItem *item);
 
-    void addImage(QGraphicsPixmapItem *pixmapItem);
+    void setImage(QGraphicsPixmapItem *pixmapItem);
 
-    void addOutline(QGraphicsPathItem *outline);
+    void setOutline(QGraphicsPathItem *outline);
 
     MarkerItem *cursor() const;
 

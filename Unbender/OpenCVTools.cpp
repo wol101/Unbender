@@ -5,7 +5,7 @@
 
 OpenCVTools::OpenCVTools() {}
 
-// routines to convert QImage to OpenCV image
+// routine to convert QImage to OpenCV image
 cv::Mat OpenCVTools::convertQImageToMat(const QImage &img)
 {
     // Grayscale (QImage::Format_Grayscale8) → CV_8UC1
@@ -27,6 +27,30 @@ cv::Mat OpenCVTools::convertQImageToMat(const QImage &img)
         return cv::Mat(img.height(), img.width(), CV_8UC4, const_cast<uchar*>(img.bits()), img.bytesPerLine()).clone();
     }
     return cv::Mat();
+}
+
+// routine to convert OpenCV to QImage image
+QImage OpenCVTools::convertMatToQImage(const cv::Mat &mat)
+{
+    // Grayscale (CV_8UC1) → QImage::Format_Grayscale8
+    if (mat.type() == CV_8UC1)
+    {
+        return QImage(mat.data, mat.cols, mat.rows, mat.step, QImage::Format_Grayscale8).copy();
+    }
+
+    // BGR (CV_8UC3) → QImage::Format_RGB888 (with channel swap)
+    else if (mat.type() == CV_8UC3)
+    {
+        QImage img(mat.data, mat.cols, mat.rows, mat.step, QImage::Format_RGB888);
+        return img.rgbSwapped();  // OpenCV uses BGR, Qt expects RGB (this routine produces a new image so copy is not needed)
+    }
+
+    // BGRA (CV_8UC4) → QImage::Format_ARGB32
+    else if (mat.type() == CV_8UC4)
+    {
+        return QImage(mat.data, mat.cols, mat.rows, mat.step, QImage::Format_ARGB32).copy();
+    }
+    return QImage();
 }
 
 // routine to threshold an image - works with any image type (converts to 8 bit grey if necessary)

@@ -11,6 +11,7 @@ GraphicsView::GraphicsView(QGraphicsScene *scene, QWidget *parent) : QGraphicsVi
 {
     // setDragMode(QGraphicsView::ScrollHandDrag);
     // setTransformationAnchor(QGraphicsView::AnchorUnderMouse);
+    setMouseTracking(true);
 }
 
 void GraphicsView::wheelEvent(QWheelEvent *event)
@@ -33,7 +34,7 @@ void GraphicsView::mousePressEvent(QMouseEvent *event)
 {
     if (event->button() == Qt::LeftButton)
     {
-        if (this->items().size() > 0)
+        if (m_image)
         {
             QPointF centre = mapToScene(event->pos());
             if (!m_cursor)
@@ -56,6 +57,28 @@ void GraphicsView::mousePressEvent(QMouseEvent *event)
 
 void GraphicsView::mouseMoveEvent(QMouseEvent *event)
 {
+    if (m_image)
+    {
+        // Map mouse position from view → scene → item
+        QPointF scenePos = mapToScene(event->pos());
+        QPointF itemPos  = m_image->mapFromScene(scenePos);
+
+        qDebug() << scenePos;
+
+        int x = static_cast<int>(itemPos.x());
+        int y = static_cast<int>(itemPos.y());
+
+        qDebug() << "x = " << x << " y = " << y;
+
+        // Bounds check
+        if (x >= 0 && y >= 0 && x < m_image->pixmap().width() && y < m_image->pixmap().height())
+        {
+            // Convert pixmap to QImage and query pixel
+            QImage img = m_image->pixmap().toImage();
+            QColor color = img.pixelColor(x, y);
+            if (QMainWindow* mainWindow = qobject_cast<QMainWindow*>(this->window())) { mainWindow->statusBar()->showMessage(QString("R = %1 G = %2 B = %3 A = %4").arg(color.red()).arg(color.green()).arg(color.blue()).arg(color.alpha())); }
+        }
+    }
 }
 
 void GraphicsView::mouseReleaseEvent(QMouseEvent *event)
@@ -133,14 +156,16 @@ void GraphicsView::addItem(QGraphicsItem *item)
     scene()->addItem(item);
 }
 
-void GraphicsView::addImage(QGraphicsPixmapItem *pixmapItem)
+void GraphicsView::setImage(QGraphicsPixmapItem *pixmapItem)
 {
+    if (m_image) scene()->removeItem(m_image);
     m_image = pixmapItem;
     scene()->addItem(m_image);
 }
 
-void GraphicsView::addOutline(QGraphicsPathItem *pathItem)
+void GraphicsView::setOutline(QGraphicsPathItem *pathItem)
 {
+    if (m_outline) scene()->removeItem(m_outline);
     m_outline = pathItem;
     m_outline->setPen(QPen(Qt::magenta, 2));
     m_outline->setBrush(Qt::NoBrush);

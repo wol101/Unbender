@@ -12,6 +12,8 @@ public:
 
     static cv::Mat convertQImageToMat(const QImage &img);
 
+    static QImage convertMatToQImage(const cv::Mat &mat);
+
     static cv::Mat thresholdImage(const cv::Mat &image, uint8_t grey8Threshold);
 
     static std::vector<cv::Point> polylineFromBinaryImage(const cv::Mat &thresh);

@@ -83,7 +83,7 @@ void MainWindow::openImage()
         {
             m_view->clear();
             QGraphicsPixmapItem *item = new QGraphicsPixmapItem(QPixmap::fromImage(image));
-            m_view->addImage(item);
+            m_view->setImage(item);
             m_view->fitInView(m_view->scene()->itemsBoundingRect(), Qt::KeepAspectRatio);
             m_image = std::make_unique<QImage>(image);
         }
@@ -99,11 +99,13 @@ void MainWindow::saveDocument()
 void MainWindow::straighten()
 {
     cv::Mat img = OpenCVTools::convertQImageToMat(*m_image);
-    cv::Mat thresh = OpenCVTools::thresholdImage(img, 1);
+    cv::Mat thresh = OpenCVTools::thresholdImage(img, 100);
+    QImage thresholdImage = OpenCVTools::convertMatToQImage(thresh);
+    m_view->setImage(new QGraphicsPixmapItem(QPixmap::fromImage(thresholdImage)));
     std::vector<cv::Point> outline = OpenCVTools::polylineFromBinaryImage(thresh);
     QPainterPath path = OpenCVTools::convertPolylineToQPainterPath(outline, true);
     QGraphicsPathItem *item = new QGraphicsPathItem(path);
-    m_view->addOutline(item);
+    m_view->setOutline(item);
     updateUI();
 }
 
