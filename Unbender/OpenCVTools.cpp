@@ -42,7 +42,7 @@ cv::Mat OpenCVTools::thresholdImage(const cv::Mat &img, uint8_t grey8Threshold)
     if (gray8.depth() != CV_8U) { gray8.convertTo(gray8, CV_8U); }
 
     // Ensure it's binary (thresholding if needed)
-    cv::threshold(img, thresh, grey8Threshold, 255, cv::THRESH_BINARY);
+    cv::threshold(gray8, thresh, grey8Threshold, 255, cv::THRESH_BINARY);
 
     return thresh;
 }
