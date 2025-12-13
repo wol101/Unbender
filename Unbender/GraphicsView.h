@@ -7,6 +7,8 @@ class QWheelEvent;
 class QMouseEvent;
 class QKeyEvent;
 class MarkerItem;
+class QGraphicsPixmapItem;
+class QGraphicsPathItem;
 
 class GraphicsView : public QGraphicsView
 {
@@ -14,6 +16,12 @@ public:
     GraphicsView(QGraphicsScene *scene, QWidget *parent = nullptr);
 
     void clear();
+
+    void addItem(QGraphicsItem *item);
+
+    void addImage(QGraphicsPixmapItem *pixmapItem);
+
+    void addOutline(QGraphicsPathItem *outline);
 
     MarkerItem *cursor() const;
 
@@ -32,6 +40,8 @@ private:
     MarkerItem *m_cursor = 0;
     MarkerItem *m_position1 = 0;
     MarkerItem *m_position2 = 0;
+    QGraphicsPixmapItem *m_image = 0;
+    QGraphicsPathItem *m_outline = 0;
 };
 
 #endif // GRAPHICSVIEW_H

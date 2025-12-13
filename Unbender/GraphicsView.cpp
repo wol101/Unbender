@@ -114,9 +114,37 @@ void GraphicsView::keyPressEvent(QKeyEvent* event)
 
 void GraphicsView::clear()
 {
-    m_cursor = 0;
-    m_position1 = 0;
-    m_position2 = 0;
+    auto deleteItem = [&](QGraphicsItem *item)
+    {
+        if (item) scene()->removeItem(item);
+        item = 0;
+    };
+    deleteItem(m_cursor);
+    deleteItem(m_position1);
+    deleteItem(m_position2);
+    deleteItem(m_image);
+    deleteItem(m_outline);
+    // and delete any misc added items
+    scene()->clear();
+}
+
+void GraphicsView::addItem(QGraphicsItem *item)
+{
+    scene()->addItem(item);
+}
+
+void GraphicsView::addImage(QGraphicsPixmapItem *pixmapItem)
+{
+    m_image = pixmapItem;
+    scene()->addItem(m_image);
+}
+
+void GraphicsView::addOutline(QGraphicsPathItem *pathItem)
+{
+    m_outline = pathItem;
+    m_outline->setPen(QPen(Qt::magenta, 2));
+    m_outline->setBrush(Qt::NoBrush);
+    scene()->addItem(m_outline);
 }
 
 MarkerItem *GraphicsView::position2() const

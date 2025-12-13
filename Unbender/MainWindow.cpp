@@ -2,6 +2,7 @@
 #include "./ui_MainWindow.h"
 
 #include "GraphicsView.h"
+#include "OpenCVTools.h"
 
 #include <QGraphicsView>
 #include <QGraphicsScene>
@@ -21,8 +22,8 @@ MainWindow::MainWindow(QWidget *parent)
 {
     m_ui->setupUi(this);
 
-    m_scene = new QGraphicsScene(this);
-    m_view = new GraphicsView(m_scene, this);
+    QGraphicsScene *scene = new QGraphicsScene(this);
+    m_view = new GraphicsView(scene, this);
     setCentralWidget(m_view);
 
     connect(m_ui->actionOpen, &QAction::triggered, this, &MainWindow::openImage);
@@ -80,19 +81,11 @@ void MainWindow::openImage()
 
         if (!image.isNull())
         {
-            m_scene->clear();
-            m_scene->addPixmap(QPixmap::fromImage(image));
             m_view->clear();
-            m_view->fitInView(m_scene->itemsBoundingRect(), Qt::KeepAspectRatio);
-            QImage grayImage = image.convertToFormat(QImage::Format_Grayscale8);
-            m_image = std::make_unique<Image<uint8_t>>(image.width(), image.height());
-            for (size_t y = 0; y < grayImage.height(); ++y)
-            {
-                uchar* row = grayImage.scanLine(y);  // raw pointer to row y
-                // Interpret row depending on format, e.g. ARGB32
-                // QRgb* pixels = reinterpret_cast<QRgb*>(row); // not needed for Format_Grayscale8
-                m_image->setRow(row, y);
-            }
+            QGraphicsPixmapItem *item = new QGraphicsPixmapItem(QPixmap::fromImage(image));
+            m_view->addImage(item);
+            m_view->fitInView(m_view->scene()->itemsBoundingRect(), Qt::KeepAspectRatio);
+            m_image = std::make_unique<QImage>(image);
         }
     }
     updateUI();
@@ -105,8 +98,12 @@ void MainWindow::saveDocument()
 
 void MainWindow::straighten()
 {
-
-
+    cv::Mat img = OpenCVTools::convertQImageToMat(*m_image);
+    cv::Mat thresh = OpenCVTools::thresholdImage(img, 1);
+    std::vector<cv::Point> outline = OpenCVTools::polylineFromBinaryImage(thresh);
+    QPainterPath path = OpenCVTools::convertPolylineToQPainterPath(outline, true);
+    QGraphicsPathItem *item = new QGraphicsPathItem(path);
+    m_view->addOutline(item);
     updateUI();
 }
 

@@ -27,6 +27,7 @@ if(${QT_VERSION_MAJOR} GREATER_EQUAL 6)
         FindCentreLine.h FindCentreLine.cpp
         MarkerItem.h MarkerItem.cpp
         Image.h
+        OpenCVTools.h OpenCVTools.cpp
 
 
 
@@ -52,6 +53,16 @@ else()
 endif()
 
 target_link_libraries(Unbender PRIVATE Qt${QT_VERSION_MAJOR}::Widgets)
+
+# Link different libraries depending on build type
+target_link_libraries(Unbender PRIVATE
+    $<$<CONFIG:Debug>:"c:/dev/opencv/build/x64/vc16/lib/opencv_world4120d">
+    $<$<CONFIG:Release>:"c:/dev/opencv/build/x64/vc16/lib/opencv_world4120">
+)
+
+
+target_include_directories(Unbender PRIVATE "c:/dev/opencv/build/include" )
+
 
 # Qt for iOS sets MACOSX_BUNDLE_GUI_IDENTIFIER automatically since Qt 6.1.
 # If you are developing for iOS or macOS you should consider setting an

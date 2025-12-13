@@ -3,10 +3,9 @@
 
 #include <QMainWindow>
 
-#include "Image.h"
-
 class QGraphicsScene;
 class GraphicsView;
+class QImage;
 
 QT_BEGIN_NAMESPACE
 namespace Ui {
@@ -35,11 +34,10 @@ private slots:
 private:
     Ui::MainWindow *m_ui = 0;
 
-    QGraphicsScene *m_scene = 0;
     GraphicsView *m_view = 0;
     QString m_filePath;
 
-    std::unique_ptr<Image<uint8_t>> m_image;
+    std::unique_ptr<QImage> m_image;
     bool m_unsavedChanges = false;
 
     void readSettings();
