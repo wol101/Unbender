@@ -88,3 +88,16 @@ install(TARGETS Unbender
 if(QT_VERSION_MAJOR EQUAL 6)
     qt_finalize_executable(Unbender)
 endif()
+
+add_custom_command(TARGET Unbender POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different "c:/dev/opencv/build/x64/vc16/bin/opencv_videoio_ffmpeg4120_64.dll" ${CMAKE_CURRENT_BINARY_DIR}
+    COMMAND $<$<CONFIG:Debug>:${CMAKE_COMMAND}> -E copy_if_different "c:/dev/opencv/build/x64/vc16/bin/opencv_world4120d.dll" ${CMAKE_CURRENT_BINARY_DIR}
+    COMMAND $<$<CONFIG:Release>:${CMAKE_COMMAND}> -E copy_if_different "c:/dev/opencv/build/x64/vc16/bin/opencv_world4120.dll" ${CMAKE_CURRENT_BINARY_DIR}
+)
+
+if(${CMAKE_BUILD_TYPE} STREQUAL "Release")
+    add_custom_command(TARGET Unbender POST_BUILD
+        COMMAND "${CMAKE_PREFIX_PATH}/bin/windeployqt.exe" "${CMAKE_CURRENT_BINARY_DIR}/Unbender.exe" # this copies the Qt dlls and a fairly minimal set of plugins
+    )
+endif()
+
