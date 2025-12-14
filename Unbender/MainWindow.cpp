@@ -81,11 +81,37 @@ void MainWindow::openImage()
 
         if (!image.isNull())
         {
-            m_view->clear();
+            // cv::Mat mat = OpenCVTools::convertQImageToMat(image);
+            // QImage newImage = OpenCVTools::convertMatToQImage(mat);
+            // QGraphicsPixmapItem *item = new QGraphicsPixmapItem(QPixmap::fromImage(newImage));
             QGraphicsPixmapItem *item = new QGraphicsPixmapItem(QPixmap::fromImage(image));
+            m_view->clear();
             m_view->setImage(item);
             m_view->fitInView(m_view->scene()->itemsBoundingRect(), Qt::KeepAspectRatio);
-            m_image = std::make_unique<QImage>(image);
+            // I want to stadardise on the endedness independent QImage formats
+            switch (image.format())
+            {
+            // these formats are used unchanged because they are endian indepenndent
+            case QImage::Format_Grayscale8:
+            case QImage::Format_RGB888:
+            case QImage::Format_RGBA8888:
+                m_image = std::make_unique<QImage>(image);
+                break;
+            // these formats need to be converted
+            case QImage::QImage::Format_Grayscale16:
+                m_image = std::make_unique<QImage>(image.convertToFormat(QImage::Format_Grayscale8));
+                break;
+            case QImage::QImage::Format_RGB32:
+                m_image = std::make_unique<QImage>(image.convertToFormat(QImage::Format_RGB888));
+                break;
+            case QImage::QImage::Format_ARGB32:
+                m_image = std::make_unique<QImage>(image.convertToFormat(QImage::Format_RGBA8888));
+                break;
+            // everything else to Format_RGB888
+            default:
+                m_image = std::make_unique<QImage>(image.convertToFormat(QImage::Format_RGB888));
+                break;
+            }
         }
     }
     updateUI();
@@ -99,7 +125,8 @@ void MainWindow::saveDocument()
 void MainWindow::straighten()
 {
     cv::Mat img = OpenCVTools::convertQImageToMat(*m_image);
-    cv::Mat thresh = OpenCVTools::thresholdImage(img, 100);
+    // cv::imwrite("C:/Scratch/converted.png", OpenCVTools::convertToGrey(img));
+    cv::Mat thresh = OpenCVTools::thresholdImage(img, 100, true);
     QImage thresholdImage = OpenCVTools::convertMatToQImage(thresh);
     m_view->setImage(new QGraphicsPixmapItem(QPixmap::fromImage(thresholdImage)));
     std::vector<cv::Point> outline = OpenCVTools::polylineFromBinaryImage(thresh);
