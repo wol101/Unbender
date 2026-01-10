@@ -5,6 +5,8 @@
 
 #include <QImage>
 
+#include <tuple>
+
 class OpenCVTools
 {
 public:
@@ -29,6 +31,11 @@ public:
     static std::string matInfoToString(const cv::Mat& img, const std::string& name = "cv::Mat");
 
     static std::string qImageInfoToString(const QImage& img, const std::string& name = "QImage");
+
+    static cv::Point2f closestPointOnSegment(const cv::Point2f& p, const cv::Point2f& a, const cv::Point2f& b, float& tOut);
+
+    static void splitPolyline(const std::vector<cv::Point2f>& poly, const cv::Point2f& userPoint, bool isClosed, std::vector<cv::Point2f>& outA, std::vector<cv::Point2f>& outB);
+
 };
 
 #endif // OPENCVTOOLS_H

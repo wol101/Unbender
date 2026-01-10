@@ -3,6 +3,7 @@
 
 #include "GraphicsView.h"
 #include "OpenCVTools.h"
+#include "MarkerItem.h"
 
 #include <QGraphicsView>
 #include <QGraphicsScene>
@@ -130,6 +131,15 @@ void MainWindow::straighten()
     QImage thresholdImage = OpenCVTools::convertMatToQImage(thresh);
     m_view->setImage(new QGraphicsPixmapItem(QPixmap::fromImage(thresholdImage)));
     std::vector<cv::Point> outline = OpenCVTools::polylineFromBinaryImage(thresh);
+    std::vector<cv::Point2f> outlinef;
+    outlinef.reserve(outline.size());
+    for (const auto& p : outline) { outlinef.emplace_back(static_cast<float>(p.x), static_cast<float>(p.y)); }
+    MarkerItem *p1 = m_view->position1();
+    cv::Point2f userPoint(p1->pos().x(), p1->pos().y());
+    bool isClosed = true;
+    std::vector<cv::Point2f> outA, outB;
+    OpenCVTools::splitPolyline(outlinef, userPoint, isClosed, outA, outB);
+
     QPainterPath path = OpenCVTools::convertPolylineToQPainterPath(outline, true);
     QGraphicsPathItem *item = new QGraphicsPathItem(path);
     m_view->setOutline(item);

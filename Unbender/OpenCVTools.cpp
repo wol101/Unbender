@@ -263,3 +263,72 @@ std::string OpenCVTools::qImageInfoToString(const QImage& img, const std::string
     return ss.str();
 }
 
+cv::Point2f OpenCVTools::closestPointOnSegment(const cv::Point2f& p, const cv::Point2f& a, const cv::Point2f& b, float& tOut)
+{
+    cv::Point2f ab = b - a;
+    float ab2 = ab.dot(ab);
+    if (ab2 == 0.0f)
+    {
+        tOut = 0.0f;
+        return a; // degenerate segment
+    }
+
+    float t = (p - a).dot(ab) / ab2;
+    t = std::max(0.0f, std::min(1.0f, t));
+    tOut = t;
+    return a + t * ab;
+}
+
+void OpenCVTools::splitPolyline(const std::vector<cv::Point2f>& poly, const cv::Point2f& userPoint, bool isClosed, std::vector<cv::Point2f>& outA, std::vector<cv::Point2f>& outB)
+{
+    int n = (int)poly.size();
+    if (n < 2)
+        return;
+
+    float bestDist2 = std::numeric_limits<float>::max();
+    int bestIndex = -1;
+    float bestT = 0.0f;
+    cv::Point2f bestPoint;
+
+    int segCount = isClosed ? n : n - 1;
+
+    // Find closest segment (including closing segment if closed)
+    for (int i = 0; i < segCount; i++)
+    {
+        int j = (i + 1) % n; // wraps around for closed polylines
+        float t;
+        cv::Point2f cp = closestPointOnSegment(userPoint, poly[i], poly[j], t);
+        float d2 = (cp - userPoint).dot(cp - userPoint);
+        if (d2 < bestDist2)
+        {
+            bestDist2 = d2;
+            bestIndex = i;
+            bestT = t;
+            bestPoint = cp;
+        }
+    }
+
+    // Build first polyline
+    outA.clear();
+    for (int i = 0; i <= bestIndex; i++)
+        outA.push_back(poly[i]);
+    outA.push_back(bestPoint);
+
+    // Build second polyline
+    outB.clear();
+    outB.push_back(bestPoint);
+
+    int next = (bestIndex + 1) % n;
+    if (!isClosed)
+    {
+        // Open polyline: just continue to the end
+        for (int i = bestIndex + 1; i < n; i++)
+            outB.push_back(poly[i]);
+    }
+    else
+    {
+        // Closed polyline: wrap around until we reach bestIndex again
+        for (int i = next; i != bestIndex; i = (i + 1) % n)
+            outB.push_back(poly[i]);
+    }
+}
