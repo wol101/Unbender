@@ -1,6 +1,8 @@
 #ifndef MAINWINDOW_H
 #define MAINWINDOW_H
 
+#include "OpenCVTools.h"
+
 #include <QMainWindow>
 
 class QGraphicsScene;
@@ -42,6 +44,11 @@ private:
 
     void readSettings();
     void writeSettings();
+
+    std::vector<cv::Point2f> m_polyA;
+    std::vector<cv::Point2f> m_polyB;
+    std::vector<cv::Point2f> m_centreLine;
+
 
 };
 #endif // MAINWINDOW_H

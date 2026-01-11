@@ -126,7 +126,6 @@ void MainWindow::saveDocument()
 void MainWindow::straighten()
 {
     cv::Mat img = OpenCVTools::convertQImageToMat(*m_image);
-    // cv::imwrite("C:/Scratch/converted.png", OpenCVTools::convertToGrey(img));
     cv::Mat thresh = OpenCVTools::thresholdImage(img, 100, true);
     QImage thresholdImage = OpenCVTools::convertMatToQImage(thresh);
     m_view->setImage(new QGraphicsPixmapItem(QPixmap::fromImage(thresholdImage)));
@@ -139,32 +138,30 @@ void MainWindow::straighten()
     cv::Point2f userPoint1(p1->pos().x(), p1->pos().y());
     float vertexTolerance = 0.001;
     std::vector<cv::Point2f> openOutline = OpenCVTools::splitClosedPolylineRobust(outlinef, userPoint1, vertexTolerance);
-    std::vector<cv::Point2f> polyA, polyB;
     MarkerItem *p2 = m_view->position2();
     cv::Point2f userPoint2(p2->pos().x(), p2->pos().y());
-    OpenCVTools::splitOpenPolylineRobust(openOutline, userPoint2, vertexTolerance, polyA, polyB);
-    std::reverse(polyB.begin(), polyB.end()); // I want both polylines to start at userPoint1
+    OpenCVTools::splitOpenPolylineRobust(openOutline, userPoint2, vertexTolerance, m_polyA, m_polyB);
+    std::reverse(m_polyB.begin(), m_polyB.end()); // I want both polylines to start at userPoint1
 
     QGraphicsPathItem *item;
-    item = new QGraphicsPathItem(OpenCVTools::convertPolylineToQPainterPath(polyA, false));
+    item = new QGraphicsPathItem(OpenCVTools::convertPolylineToQPainterPath(m_polyA, false));
     item->setPen(QPen(Qt::cyan, 2));
     item->setBrush(Qt::NoBrush);
     m_view->addItem(item);
-    item = new QGraphicsPathItem(OpenCVTools::convertPolylineToQPainterPath(polyB, false));
+    item = new QGraphicsPathItem(OpenCVTools::convertPolylineToQPainterPath(m_polyB, false));
     item->setPen(QPen(Qt::magenta, 2));
     item->setBrush(Qt::NoBrush);
     m_view->addItem(item);
 
     size_t segments = 100;
-    std::vector<cv::Point2f> centreLine;
-    centreLine.reserve(segments + 1);
+    m_centreLine.clear();
     std::vector<cv::Point2f> stick(2);
     for (size_t i = 0; i < segments + 1; ++i)
     {
         float t = float(i) / 100.0f;
-        cv::Point2f a = OpenCVTools::pointAtProportion(polyA, t);
-        cv::Point2f b = OpenCVTools::pointAtProportion(polyB, t);
-        centreLine.push_back(cv::Point2f(0.5f * (a.x + b.x), 0.5f * (a.y + b.y)));
+        cv::Point2f a = OpenCVTools::pointAtProportion(m_polyA, t);
+        cv::Point2f b = OpenCVTools::pointAtProportion(m_polyB, t);
+        m_centreLine.push_back(cv::Point2f(0.5f * (a.x + b.x), 0.5f * (a.y + b.y)));
 
         stick[0] = a; stick[1] = b;
         item = new QGraphicsPathItem(OpenCVTools::convertPolylineToQPainterPath(stick, false));
@@ -173,7 +170,7 @@ void MainWindow::straighten()
         m_view->addItem(item);
     }
 
-    item = new QGraphicsPathItem(OpenCVTools::convertPolylineToQPainterPath(centreLine, false));
+    item = new QGraphicsPathItem(OpenCVTools::convertPolylineToQPainterPath(m_centreLine, false));
     item->setPen(QPen(Qt::yellow, 2));
     item->setBrush(Qt::NoBrush);
     m_view->addItem(item);
@@ -185,6 +182,7 @@ void MainWindow::updateUI()
 {
     m_ui->actionOpen->setEnabled(true);
     m_ui->actionStraighten->setEnabled(m_image != 0 && m_view->position1() && m_view->position2());
+    m_ui->actionStraightenMore->setEnabled(m_image != 0 && m_view->position1() && m_view->position2() && m_polyA.size() && m_polyB.size() && m_centreLine.size());
 }
 
 void MainWindow::readSettings()

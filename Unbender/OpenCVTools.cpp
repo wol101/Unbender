@@ -563,3 +563,76 @@ cv::Point2f OpenCVTools::pointAtProportion(const std::vector<cv::Point2f>& poly,
 }
 
 
+// ------------------------------------------------------------
+// Find all intersection points between two polylines
+// ------------------------------------------------------------
+// computes all intersection points between two OpenCV polylines. It works for:
+// - Open or closed polylines
+// - Self-intersecting shapes
+// - Horizontal, vertical, and diagonal segments
+// - Floating-point precision
+// The algorithm is simple and deterministic:
+// - Treat each polyline as a sequence of line segments.
+// - Test every segment of polyline A against every segment of polyline B.
+// - Use a stable segment–segment intersection routine.
+// - Collect all intersection points.
+
+std::vector<cv::Point2f> OpenCVTools::intersectPolylines(const std::vector<cv::Point2f>& poly1, const std::vector<cv::Point2f>& poly2)
+{
+    std::vector<cv::Point2f> intersections;
+
+    if (poly1.size() < 2 || poly2.size() < 2)
+        return intersections;
+
+    for (size_t i = 0; i + 1 < poly1.size(); ++i)
+    {
+        cv::Point2f A = poly1[i];
+        cv::Point2f B = poly1[i + 1];
+
+        for (size_t j = 0; j + 1 < poly2.size(); ++j)
+        {
+            cv::Point2f C = poly2[j];
+            cv::Point2f D = poly2[j + 1];
+
+            cv::Point2f P;
+            if (segmentIntersection(A, B, C, D, P))
+            {
+                intersections.push_back(P);
+            }
+        }
+    }
+
+    return intersections;
+}
+
+// ------------------------------------------------------------
+// Compute intersection between two line segments AB and CD.
+// Returns true if they intersect and outputs the intersection point.
+// ------------------------------------------------------------
+bool OpenCVTools::segmentIntersection(const cv::Point2f& A, const cv::Point2f& B, const cv::Point2f& C, const cv::Point2f& D, cv::Point2f& out)
+{
+    cv::Point2f r = B - A;
+    cv::Point2f s = D - C;
+
+    float rxs = r.x * s.y - r.y * s.x;
+    float qpxr = (C.x - A.x) * r.y - (C.y - A.y) * r.x;
+
+    if (std::fabs(rxs) < std::numeric_limits<float>::epsilon())
+    {
+        // Lines are parallel or collinear
+        return false;
+    }
+
+    float t = ((C.x - A.x) * s.y - (C.y - A.y) * s.x) / rxs;
+    float u = qpxr / rxs;
+
+    if (t >= 0 && t <= 1 && u >= 0 && u <= 1)
+    {
+        out = A + t * r;
+        return true;
+    }
+
+    return false;
+}
+
+

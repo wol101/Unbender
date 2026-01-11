@@ -36,6 +36,7 @@
      <string>Action</string>
     </property>
     <addaction name="actionStraighten"/>
+    <addaction name="actionStraightenMore"/>
    </widget>
    <addaction name="menuFile"/>
    <addaction name="menuAction"/>
@@ -54,6 +55,11 @@
   <action name="actionStraighten">
    <property name="text">
     <string>Straighten</string>
+   </property>
+  </action>
+  <action name="actionStraightenMore">
+   <property name="text">
+    <string>Straighten More</string>
    </property>
   </action>
  </widget>

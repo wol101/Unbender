@@ -43,6 +43,11 @@ public:
 
     static cv::Point2f pointAtProportion(const std::vector<cv::Point2f>& poly, float t);
 
+    static std::vector<cv::Point2f> intersectPolylines(const std::vector<cv::Point2f>& poly1, const std::vector<cv::Point2f>& poly2);
+
+    static bool segmentIntersection(const cv::Point2f& A, const cv::Point2f& B, const cv::Point2f& C, const cv::Point2f& D, cv::Point2f& out);
+
+
 };
 
 #endif // OPENCVTOOLS_H
