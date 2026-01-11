@@ -517,3 +517,49 @@ void OpenCVTools::splitOpenPolylineRobust(const std::vector<cv::Point2f>& poly, 
     polyB.insert(polyB.end(), poly.begin() + bestVertex + 1, poly.end());
 }
 
+// poly — std::vector<cv::Point2f>
+// t — proportion in [0,1]
+// Returns the interpolated point at distance t * total_length.
+
+cv::Point2f OpenCVTools::pointAtProportion(const std::vector<cv::Point2f>& poly, float t)
+{
+    const int N = poly.size();
+    if (N == 0)
+        return cv::Point2f();
+    if (N == 1)
+        return poly[0];
+
+    // Clamp proportion
+    t = std::max(0.0f, std::min(1.0f, t));
+
+    // Compute total length
+    float totalLen = 0.0;
+    std::vector<float> segLen(N - 1);
+    for (int i = 0; i < N - 1; ++i)
+    {
+        segLen[i] = cv::norm(poly[i+1] - poly[i]);
+        totalLen += segLen[i];
+    }
+
+    if (totalLen == 0.0)
+        return poly[0];
+
+    float target = t * totalLen;
+
+    // Walk segments until we reach the target
+    float accum = 0.0;
+    for (int i = 0; i < N - 1; ++i)
+    {
+        if (accum + segLen[i] >= target)
+        {
+            float localT = (target - accum) / segLen[i];
+            return poly[i] + (poly[i+1] - poly[i]) * localT;
+        }
+        accum += segLen[i];
+    }
+
+    // Numerical edge case: return last point
+    return poly.back();
+}
+
+

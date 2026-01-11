@@ -41,6 +41,8 @@ public:
 
     static void splitOpenPolylineRobust(const std::vector<cv::Point2f>& poly, const cv::Point2f& userPoint, float vertexTolerance, std::vector<cv::Point2f>& polyA, std::vector<cv::Point2f>& polyB);
 
+    static cv::Point2f pointAtProportion(const std::vector<cv::Point2f>& poly, float t);
+
 };
 
 #endif // OPENCVTOOLS_H

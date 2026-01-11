@@ -137,12 +137,13 @@ void MainWindow::straighten()
     for (const auto& p : outline) { outlinef.emplace_back(static_cast<float>(p.x), static_cast<float>(p.y)); }
     MarkerItem *p1 = m_view->position1();
     cv::Point2f userPoint1(p1->pos().x(), p1->pos().y());
-    double vertexTolerance = 0.001;
+    float vertexTolerance = 0.001;
     std::vector<cv::Point2f> openOutline = OpenCVTools::splitClosedPolylineRobust(outlinef, userPoint1, vertexTolerance);
     std::vector<cv::Point2f> polyA, polyB;
     MarkerItem *p2 = m_view->position2();
     cv::Point2f userPoint2(p2->pos().x(), p2->pos().y());
     OpenCVTools::splitOpenPolylineRobust(openOutline, userPoint2, vertexTolerance, polyA, polyB);
+    std::reverse(polyB.begin(), polyB.end()); // I want both polylines to start at userPoint1
 
     QGraphicsPathItem *item;
     item = new QGraphicsPathItem(OpenCVTools::convertPolylineToQPainterPath(polyA, false));
@@ -151,6 +152,22 @@ void MainWindow::straighten()
     m_view->addItem(item);
     item = new QGraphicsPathItem(OpenCVTools::convertPolylineToQPainterPath(polyB, false));
     item->setPen(QPen(Qt::magenta, 2));
+    item->setBrush(Qt::NoBrush);
+    m_view->addItem(item);
+
+    size_t segments = 100;
+    std::vector<cv::Point2f> centreLine;
+    centreLine.reserve(segments + 1);
+    for (size_t i = 0; i < segments + 1; ++i)
+    {
+        float t = float(i) / 100.0f;
+        cv::Point2f a = OpenCVTools::pointAtProportion(polyA, t);
+        cv::Point2f b = OpenCVTools::pointAtProportion(polyB, t);
+        centreLine.push_back(cv::Point2f(0.5f * (a.x + b.x), 0.5f * (a.y + b.y)));
+    }
+
+    item = new QGraphicsPathItem(OpenCVTools::convertPolylineToQPainterPath(centreLine, false));
+    item->setPen(QPen(Qt::yellow, 2));
     item->setBrush(Qt::NoBrush);
     m_view->addItem(item);
 
