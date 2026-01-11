@@ -133,18 +133,12 @@ void GraphicsView::keyPressEvent(QKeyEvent* event)
 
 void GraphicsView::clear()
 {
-    auto deleteItem = [&](QGraphicsItem *item)
-    {
-        if (item) scene()->removeItem(item);
-        item = 0;
-    };
-    deleteItem(m_cursor);
-    deleteItem(m_position1);
-    deleteItem(m_position2);
-    deleteItem(m_image);
-    deleteItem(m_outline);
-    // and delete any misc added items
     scene()->clear();
+    m_cursor = 0;
+    m_position1 = 0;
+    m_position2 = 0;
+    m_image = 0;
+    m_outline = 0;
 }
 
 void GraphicsView::addItem(QGraphicsItem *item)

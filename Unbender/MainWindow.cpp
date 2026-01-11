@@ -131,17 +131,29 @@ void MainWindow::straighten()
     QImage thresholdImage = OpenCVTools::convertMatToQImage(thresh);
     m_view->setImage(new QGraphicsPixmapItem(QPixmap::fromImage(thresholdImage)));
     std::vector<cv::Point> outline = OpenCVTools::polylineFromBinaryImage(thresh);
+
     std::vector<cv::Point2f> outlinef;
     outlinef.reserve(outline.size());
     for (const auto& p : outline) { outlinef.emplace_back(static_cast<float>(p.x), static_cast<float>(p.y)); }
     MarkerItem *p1 = m_view->position1();
-    cv::Point2f userPoint(p1->pos().x(), p1->pos().y());
-    bool isClosed = true;
-    std::vector<cv::Point2f> outA, outB;
-    OpenCVTools::splitPolyline(outlinef, userPoint, isClosed, outA, outB);
+    cv::Point2f userPoint1(p1->pos().x(), p1->pos().y());
+    double vertexTolerance = 0.001;
+    std::vector<cv::Point2f> openOutline = OpenCVTools::splitClosedPolylineRobust(outlinef, userPoint1, vertexTolerance);
+    std::vector<cv::Point2f> polyA, polyB;
+    MarkerItem *p2 = m_view->position2();
+    cv::Point2f userPoint2(p2->pos().x(), p2->pos().y());
+    OpenCVTools::splitOpenPolylineRobust(openOutline, userPoint2, vertexTolerance, polyA, polyB);
 
-    QPainterPath path = OpenCVTools::convertPolylineToQPainterPath(outline, true);
-    QGraphicsPathItem *item = new QGraphicsPathItem(path);
+    QGraphicsPathItem *item;
+    item = new QGraphicsPathItem(OpenCVTools::convertPolylineToQPainterPath(polyA, false));
+    item->setPen(QPen(Qt::magenta, 2));
+    item->setBrush(Qt::NoBrush);
+    m_view->addItem(item);
+    item = new QGraphicsPathItem(OpenCVTools::convertPolylineToQPainterPath(polyB, false));
+    item->setPen(QPen(Qt::yellow, 2));
+    item->setBrush(Qt::NoBrush);
+    m_view->addItem(item);
+
     m_view->setOutline(item);
     updateUI();
 }
@@ -149,7 +161,7 @@ void MainWindow::straighten()
 void MainWindow::updateUI()
 {
     m_ui->actionOpen->setEnabled(true);
-    m_ui->actionStraighten->setEnabled(m_image != 0 /*&& m_view->position1() && m_view->position2()*/);
+    m_ui->actionStraighten->setEnabled(m_image != 0 && m_view->position1() && m_view->position2());
 }
 
 void MainWindow::readSettings()

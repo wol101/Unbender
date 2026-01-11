@@ -181,6 +181,16 @@ QPainterPath OpenCVTools::convertPolylineToQPainterPath(const std::vector<cv::Po
     return path;
 }
 
+QPainterPath OpenCVTools::convertPolylineToQPainterPath(const std::vector<cv::Point2f> &polyline, bool joinEnds)
+{
+    std::vector<cv::Point> polyline2;
+    polyline2.reserve(polyline.size());
+    for (const auto& p : polyline) { polyline2.emplace_back(static_cast<int>(p.x), static_cast<int>(p.y)); }
+    return convertPolylineToQPainterPath(polyline2, joinEnds);
+}
+
+std::vector<cv::Point2f> outlinef;
+
 // For each pixel (B, G, R, A) in BGRA:
 //         A
 // B' = ------- * B + (1 - A/255) * 255
@@ -266,72 +276,294 @@ std::string OpenCVTools::qImageInfoToString(const QImage& img, const std::string
     return ss.str();
 }
 
-cv::Point2f OpenCVTools::closestPointOnSegment(const cv::Point2f& p, const cv::Point2f& a, const cv::Point2f& b, float& tOut)
+double OpenCVTools::dist2(const cv::Point2f& a, const cv::Point2f& b)
 {
-    cv::Point2f ab = b - a;
-    float ab2 = ab.dot(ab);
-    if (ab2 == 0.0f)
-    {
-        tOut = 0.0f;
-        return a; // degenerate segment
-    }
-
-    float t = (p - a).dot(ab) / ab2;
-    t = std::max(0.0f, std::min(1.0f, t));
-    tOut = t;
-    return a + t * ab;
+    double dx = a.x - b.x;
+    double dy = a.y - b.y;
+    return dx*dx + dy*dy;
 }
 
-void OpenCVTools::splitPolyline(const std::vector<cv::Point2f>& poly, const cv::Point2f& userPoint, bool isClosed, std::vector<cv::Point2f>& outA, std::vector<cv::Point2f>& outB)
+// Returns the closest point on segment AB to point P.
+// Also returns the parametric t in [0,1].
+cv::Point2f OpenCVTools::closestPointOnSegment(const cv::Point2f& A, const cv::Point2f& B, const cv::Point2f& P, double& tOut)
 {
-    int n = (int)poly.size();
-    if (n < 2)
-        return;
+    cv::Point2f AB = B - A;
+    double ab2 = AB.dot(AB);
 
-    float bestDist2 = std::numeric_limits<float>::max();
-    int bestIndex = -1;
-    float bestT = 0.0f;
+    if (ab2 == 0.0) {
+        tOut = 0.0;
+        return A; // Degenerate segment
+    }
+
+    double t = (P - A).dot(AB) / ab2;
+    t = std::max(0.0, std::min(1.0, t));
+    tOut = t;
+    return A + AB * t;
+}
+
+// Split a closed polyline based on a user point:
+//
+// If user point is close to a vertex:
+// •	Within vertexTolerance → split at that vertex
+// •	No new point inserted
+// •	Polyline starts at that vertex
+// Otherwise:
+// •	Compute closest point on the closest segment
+// •	Insert that point
+// •	Rotate so it becomes the start
+// •	Polyline becomes open
+//
+// 1.  Find the closest point on the entire closed polyline, considering:
+//     o   Distances to vertices
+//     o   Distances to segments (projected point)
+// 2.  If the closest vertex is within the user supplied tolerance, split at that vertex.
+// 3.  Otherwise, split at the closest point on the closest segment (inserting a new point).
+// 4.  Rotate the polyline so the split point becomes index 0.
+// 5.  Remove the closing duplicate if present.
+
+std::vector<cv::Point2f> OpenCVTools::splitClosedPolylineAtClosest(const std::vector<cv::Point2f>& closedPoly, const cv::Point2f& userPoint, double vertexTolerance)
+{
+    const int N = closedPoly.size();
+    if (N < 2) return closedPoly;
+
+    // If last == first, ignore the duplicate for processing
+    bool hasClosingDup = (closedPoly.front() == closedPoly.back());
+    int M = hasClosingDup ? N - 1 : N;
+
+    // Track best candidate
+    double bestDist2 = std::numeric_limits<double>::max();
+    int bestVertex = -1;
+    int bestSeg = -1;
+    // double bestT = 0.0;
     cv::Point2f bestPoint;
 
-    int segCount = isClosed ? n : n - 1;
-
-    // Find closest segment (including closing segment if closed)
-    for (int i = 0; i < segCount; i++)
-    {
-        int j = (i + 1) % n; // wraps around for closed polylines
-        float t;
-        cv::Point2f cp = closestPointOnSegment(userPoint, poly[i], poly[j], t);
-        float d2 = (cp - userPoint).dot(cp - userPoint);
-        if (d2 < bestDist2)
-        {
+    // 1. Check vertices
+    for (int i = 0; i < M; ++i) {
+        double d2 = dist2(closedPoly[i], userPoint);
+        if (d2 < bestDist2) {
             bestDist2 = d2;
-            bestIndex = i;
+            bestVertex = i;
+            bestSeg = -1;
+            bestPoint = closedPoly[i];
+        }
+    }
+
+    // 2. Check segments
+    for (int i = 0; i < M; ++i) {
+        int j = (i + 1) % M;
+        double t;
+        cv::Point2f cp = closestPointOnSegment(closedPoly[i], closedPoly[j], userPoint, t);
+        double d2 = dist2(cp, userPoint);
+        if (d2 < bestDist2) {
+            bestDist2 = d2;
+            bestVertex = -1;
+            bestSeg = i;
+            // bestT = t;
+            bestPoint = cp;
+        }
+    }
+
+    // 3. Decide: vertex or edge?
+    std::vector<cv::Point2f> result;
+
+    if (bestVertex >= 0 && std::sqrt(bestDist2) <= vertexTolerance) {
+        // Split at vertex
+        result.reserve(M);
+        for (int k = 0; k < M; ++k) {
+            result.push_back(closedPoly[(bestVertex + k) % M]);
+        }
+    } else {
+        // Split at edge: insert new point
+        int i = bestSeg;
+        // int j = (i + 1) % M;
+
+        // Build new polyline with inserted point
+        std::vector<cv::Point2f> temp;
+        temp.reserve(M + 1);
+
+        for (int k = 0; k < M; ++k) {
+            temp.push_back(closedPoly[k]);
+            if (k == i) {
+                temp.push_back(bestPoint); // Insert split point
+            }
+        }
+
+        // Now rotate so split point is first
+        int splitIdx = i + 1; // inserted point index
+        int newSize = temp.size();
+        result.reserve(newSize);
+
+        for (int k = 0; k < newSize; ++k) {
+            result.push_back(temp[(splitIdx + k) % newSize]);
+        }
+    }
+
+    return result; // Open polyline
+}
+
+// Split a closed polyline based on a user point:
+//
+// This is a version that is robust for:
+// •   Self intersecting contours (figure 8, bow ties, spirals, etc.)
+// •   Contours with repeated vertices
+// •   Contours where the closest point lies on an edge that crosses itself
+// •   Contours where the user point is near a vertex but not necessarily the “first” instance of that vertex
+// The key idea is:
+// 1.  Treat the polyline as a sequence of segments, not a topological loop.
+// 2.  Find the closest point on any segment or vertex.
+// 3.  If the closest vertex is within tolerance, split at that vertex index.
+// 4.  Otherwise, split at the closest point on the closest segment, inserting a new point between the correct indices, even if that segment participates in a self intersection.
+// 5.  Rotate the sequence so the split point becomes index 0.
+// 6.  Do not attempt to “fix” or reorder self intersections — preserve the original order exactly.
+
+std::vector<cv::Point2f> OpenCVTools::splitClosedPolylineRobust(const std::vector<cv::Point2f>& closedPoly, const cv::Point2f& userPoint, double vertexTolerance)
+{
+    const int N = closedPoly.size();
+    if (N < 2) return closedPoly;
+
+    // Detect and ignore closing duplicate
+    bool hasClosingDup = (closedPoly.front() == closedPoly.back());
+    int M = hasClosingDup ? N - 1 : N;
+
+    // Best candidate tracking
+    double bestDist2 = std::numeric_limits<double>::max();
+    int bestVertex = -1;
+    int bestSeg = -1;
+    double bestT = 0.0;
+    cv::Point2f bestPoint;
+
+    // --- 1. Check vertices ---
+    for (int i = 0; i < M; ++i) {
+        double d2 = dist2(closedPoly[i], userPoint);
+        if (d2 < bestDist2) {
+            bestDist2 = d2;
+            bestVertex = i;
+            bestSeg = -1;
+            bestPoint = closedPoly[i];
+        }
+    }
+
+    // --- 2. Check segments ---
+    for (int i = 0; i < M; ++i) {
+        int j = (i + 1) % M;
+        double t;
+        cv::Point2f cp = closestPointOnSegment(closedPoly[i], closedPoly[j], userPoint, t);
+        double d2 = dist2(cp, userPoint);
+        if (d2 < bestDist2) {
+            bestDist2 = d2;
+            bestVertex = -1;
+            bestSeg = i;
             bestT = t;
             bestPoint = cp;
         }
     }
 
-    // Build first polyline
-    outA.clear();
-    for (int i = 0; i <= bestIndex; i++)
-        outA.push_back(poly[i]);
-    outA.push_back(bestPoint);
+    // --- 3. Decide: vertex or edge ---
+    std::vector<cv::Point2f> result;
 
-    // Build second polyline
-    outB.clear();
-    outB.push_back(bestPoint);
+    if (bestVertex >= 0 && std::sqrt(bestDist2) <= vertexTolerance) {
+        // Split at vertex
+        result.reserve(M);
+        for (int k = 0; k < M; ++k) {
+            result.push_back(closedPoly[(bestVertex + k) % M]);
+        }
+        return result;
+    }
 
-    int next = (bestIndex + 1) % n;
-    if (!isClosed)
-    {
-        // Open polyline: just continue to the end
-        for (int i = bestIndex + 1; i < n; i++)
-            outB.push_back(poly[i]);
+    // --- 4. Split at edge (insert new point) ---
+    int i = bestSeg;
+    int j = (i + 1) % M;
+
+    std::vector<cv::Point2f> temp;
+    temp.reserve(M + 1);
+
+    for (int k = 0; k < M; ++k) {
+        temp.push_back(closedPoly[k]);
+        if (k == i) {
+            temp.push_back(bestPoint); // Insert split point
+        }
     }
-    else
-    {
-        // Closed polyline: wrap around until we reach bestIndex again
-        for (int i = next; i != bestIndex; i = (i + 1) % n)
-            outB.push_back(poly[i]);
+
+    // --- 5. Rotate so split point is first ---
+    int splitIdx = i + 1;
+    int newSize = temp.size();
+    result.reserve(newSize);
+
+    for (int k = 0; k < newSize; ++k) {
+        result.push_back(temp[(splitIdx + k) % newSize]);
     }
+
+    return result;
 }
+
+// Split an open polyline based on a user point and return the two new polylines:
+//
+// Since the polyline is open, we no longer “rotate” it. Instead, we cut it into:
+// •   polyA: from the start of the original polyline up to the split point
+// •   polyB: from the split point to the end of the original polyline
+// The split point is chosen using the same criteria as before:
+// 1.  Compute the closest point on the polyline (vertices + segments).
+// 2.  If the closest vertex is within the user supplied tolerance → split at that vertex.
+// 3.  Otherwise → split at the closest point on the closest segment, inserting a new point.
+// This version is robust for self intersecting open polylines because it never assumes any topology — it only uses the index order.
+
+void OpenCVTools::splitOpenPolylineRobust(const std::vector<cv::Point2f>& poly, const cv::Point2f& userPoint, double vertexTolerance, std::vector<cv::Point2f>& polyA, std::vector<cv::Point2f>& polyB)
+{
+    const int N = poly.size();
+    polyA.clear();
+    polyB.clear();
+
+    if (N < 2) {
+        polyA = poly;
+        return;
+    }
+
+    double bestDist2 = std::numeric_limits<double>::max();
+    int bestVertex = -1;
+    int bestSeg = -1;
+    // double bestT = 0.0;
+    cv::Point2f bestPoint;
+
+    // Check vertices
+    for (int i = 0; i < N; ++i) {
+        double d2 = dist2(poly[i], userPoint);
+        if (d2 < bestDist2) {
+            bestDist2 = d2;
+            bestVertex = i;
+            bestSeg = -1;
+            bestPoint = poly[i];
+            // bestT = 0.0;
+        }
+    }
+
+    // Check segments
+    for (int i = 0; i < N - 1; ++i) {
+        double t;
+        cv::Point2f cp = closestPointOnSegment(poly[i], poly[i+1], userPoint, t);
+        double d2 = dist2(cp, userPoint);
+        if (d2 < bestDist2) {
+            bestDist2 = d2;
+            bestVertex = -1;
+            bestSeg = i;
+            // bestT = t;
+            bestPoint = cp;
+        }
+    }
+
+    // Split at vertex
+    if (bestVertex >= 0 && std::sqrt(bestDist2) <= vertexTolerance) {
+        polyA.insert(polyA.end(), poly.begin(), poly.begin() + bestVertex + 1);
+        polyB.insert(polyB.end(), poly.begin() + bestVertex, poly.end());
+        return;
+    }
+
+    // Split at segment (insert new point)
+    int i = bestSeg;
+
+    polyA.insert(polyA.end(), poly.begin(), poly.begin() + i + 1);
+    polyA.push_back(bestPoint);
+
+    polyB.push_back(bestPoint);
+    polyB.insert(polyB.end(), poly.begin() + i + 1, poly.end());
+}
+

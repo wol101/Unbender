@@ -23,6 +23,7 @@ public:
     static std::vector<cv::Point> polylineFromBinaryImage(const cv::Mat &thresh);
 
     static QPainterPath convertPolylineToQPainterPath(const std::vector<cv::Point> &polyline, bool joinEnds);
+    static QPainterPath convertPolylineToQPainterPath(const std::vector<cv::Point2f> &polyline, bool joinEnds);
 
     static cv::Mat bgraToBgrOnWhite(const cv::Mat& imgBGRA);
 
@@ -32,9 +33,15 @@ public:
 
     static std::string qImageInfoToString(const QImage& img, const std::string& name = "QImage");
 
-    static cv::Point2f closestPointOnSegment(const cv::Point2f& p, const cv::Point2f& a, const cv::Point2f& b, float& tOut);
+    static double dist2(const cv::Point2f& a, const cv::Point2f& b);
 
-    static void splitPolyline(const std::vector<cv::Point2f>& poly, const cv::Point2f& userPoint, bool isClosed, std::vector<cv::Point2f>& outA, std::vector<cv::Point2f>& outB);
+    static cv::Point2f closestPointOnSegment(const cv::Point2f& A, const cv::Point2f& B, const cv::Point2f& P, double& tOut);
+
+    static std::vector<cv::Point2f> splitClosedPolylineAtClosest(const std::vector<cv::Point2f>& closedPoly, const cv::Point2f& userPoint, double vertexTolerance);
+
+    static std::vector<cv::Point2f> splitClosedPolylineRobust(const std::vector<cv::Point2f>& closedPoly, const cv::Point2f& userPoint, double vertexTolerance);
+
+    static void splitOpenPolylineRobust(const std::vector<cv::Point2f>& poly, const cv::Point2f& userPoint, double vertexTolerance, std::vector<cv::Point2f>& polyA, std::vector<cv::Point2f>& polyB);
 
 };
 
