@@ -79,8 +79,6 @@ QImage OpenCVTools::convertMatToQImage(const cv::Mat &mat)
 cv::Mat OpenCVTools::convertToGrey(const cv::Mat &img)
 {
     cv::Mat grey;
-    // std::string s = matInfoToString(img, "input"); qDebug() << s.c_str();
-    // cv::imwrite("C:/Scratch/incoming.png", img);
     // Handle common cases
     while (true)
     {
@@ -141,7 +139,6 @@ cv::Mat OpenCVTools::thresholdImage(const cv::Mat &img, uint8_t grey8Threshold, 
     return thresh;
 }
 
-
 // routine to get an approximate polyline from a binary image
 std::vector<cv::Point> OpenCVTools::polylineFromBinaryImage(const cv::Mat &thresh)
 {
@@ -185,9 +182,15 @@ QPainterPath OpenCVTools::convertPolylineToQPainterPath(const std::vector<cv::Po
 }
 
 // For each pixel (B, G, R, A) in BGRA:
-// [ B' = \frac{A}{255} \cdot B + \left(1 - \frac{A}{255}\right) \cdot 255 ]
-// [ G' = \frac{A}{255} \cdot G + \left(1 - \frac{A}{255}\right) \cdot 255 ]
-// [ R' = \frac{A}{255} \cdot R + \left(1 - \frac{A}{255}\right) \cdot 255 ]
+//         A
+// B' = ------- * B + (1 - A/255) * 255
+//        255
+//         A
+// G' = ------- * G + (1 - A/255) * 255
+//        255
+//         A
+// R' = ------- * R + (1 - A/255) * 255
+//        255
 // This blends the pixel with white according to alpha.
 
 cv::Mat OpenCVTools::bgraToBgrOnWhite(const cv::Mat& imgBGRA)
