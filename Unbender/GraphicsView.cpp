@@ -16,18 +16,23 @@ GraphicsView::GraphicsView(QGraphicsScene *scene, QWidget *parent) : QGraphicsVi
 
 void GraphicsView::wheelEvent(QWheelEvent *event)
 {
-    const double scaleFactor = 1.15; // zoom in/out factor
+    // Zoom factor
+    const double zoomInFactor = 1.15;
+    const double zoomOutFactor = 1.0 / zoomInFactor;
 
-    if (event->angleDelta().y() > 0)
-    {
-        // Zoom in
-        scale(scaleFactor, scaleFactor);
-    }
-    else
-    {
-        // Zoom out
-        scale(1.0 / scaleFactor, 1.0 / scaleFactor);
-    }
+    // Save the scene position under the mouse
+    QPointF beforeScale = mapToScene(event->position().toPoint());
+
+    // Choose zoom direction
+    double factor = (event->angleDelta().y() > 0) ? zoomInFactor : zoomOutFactor;
+    scale(factor, factor);
+
+    // After scaling, map the mouse position again
+    QPointF afterScale = mapToScene(event->position().toPoint());
+
+    // Adjust the view so the mouse stays over the same scene point
+    QPointF offset = afterScale - beforeScale;
+    translate(offset.x(), offset.y());
 }
 
 void GraphicsView::mousePressEvent(QMouseEvent *event)

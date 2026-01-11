@@ -15,13 +15,13 @@ cv::Mat OpenCVTools::convertQImageToMat(const QImage &img)
         // Grayscale (QImage::Format_Grayscale8) → CV_8UC1
         if (img.format() == QImage::Format_Grayscale8)
         {
-            return cv::Mat(img.height(), img.width(), CV_8UC1, const_cast<uchar*>(img.bits()), img.bytesPerLine()).clone();
+            return cv::Mat(img.height(), img.width(), CV_8UC1, const_cast<uchar*>(img.bits()), img.bytesPerLine()).clone(); // clone required so the returned image owns data
         }
 
         // RGB (QImage::Format_RGB888) → CV_8UC3 (needs channel swap)
         if (img.format() == QImage::Format_RGB888)
         {
-            cv::Mat mat(img.height(), img.width(), CV_8UC3, const_cast<uchar*>(img.bits()), img.bytesPerLine());
+            cv::Mat mat(img.height(), img.width(), CV_8UC3, const_cast<uchar*>(img.bits()), img.bytesPerLine()); // note mat does not own data
             cv::Mat matBGR;
             cv::cvtColor(mat, matBGR, cv::COLOR_RGB2BGR); // Qt uses RGB, OpenCV expects BGR
             return matBGR;
@@ -30,7 +30,7 @@ cv::Mat OpenCVTools::convertQImageToMat(const QImage &img)
         // RGB (QImage::Format_RGBA8888) → CV_8UC4 (needs channel swap and throws away the unused alpha channel)
         if (img.format() == QImage::Format_RGBA8888)
         {
-            cv::Mat mat(img.height(), img.width(), CV_8UC4, const_cast<uchar*>(img.bits()), img.bytesPerLine());
+            cv::Mat mat(img.height(), img.width(), CV_8UC4, const_cast<uchar*>(img.bits()), img.bytesPerLine()); // note mat does not own data
             cv::Mat matBGRA;
             cv::cvtColor(mat, matBGRA, cv::COLOR_RGBA2BGRA); // Qt uses ARGB, OpenCV expects BGRA
             return matBGRA;
@@ -95,7 +95,6 @@ cv::Mat OpenCVTools::convertToGrey(const cv::Mat &img)
             // it is better to blend the image as if it was being drawn on a background
             cv::Mat bgr = bgraToBgrOnWhite(img);
             cv::cvtColor(bgr, grey, cv::COLOR_BGR2GRAY);
-            // cv::imwrite("C:/Scratch/grey.png", grey);
             break;
         }
         if (img.channels() == 1)
@@ -276,27 +275,27 @@ std::string OpenCVTools::qImageInfoToString(const QImage& img, const std::string
     return ss.str();
 }
 
-double OpenCVTools::dist2(const cv::Point2f& a, const cv::Point2f& b)
+float OpenCVTools::dist2(const cv::Point2f& a, const cv::Point2f& b)
 {
-    double dx = a.x - b.x;
-    double dy = a.y - b.y;
+    float dx = a.x - b.x;
+    float dy = a.y - b.y;
     return dx*dx + dy*dy;
 }
 
 // Returns the closest point on segment AB to point P.
 // Also returns the parametric t in [0,1].
-cv::Point2f OpenCVTools::closestPointOnSegment(const cv::Point2f& A, const cv::Point2f& B, const cv::Point2f& P, double& tOut)
+cv::Point2f OpenCVTools::closestPointOnSegment(const cv::Point2f& A, const cv::Point2f& B, const cv::Point2f& P, float& tOut)
 {
     cv::Point2f AB = B - A;
-    double ab2 = AB.dot(AB);
+    float ab2 = AB.dot(AB);
 
     if (ab2 == 0.0) {
         tOut = 0.0;
         return A; // Degenerate segment
     }
 
-    double t = (P - A).dot(AB) / ab2;
-    t = std::max(0.0, std::min(1.0, t));
+    float t = (P - A).dot(AB) / ab2;
+    t = std::max(0.0f, std::min(1.0f, t));
     tOut = t;
     return A + AB * t;
 }
@@ -313,96 +312,6 @@ cv::Point2f OpenCVTools::closestPointOnSegment(const cv::Point2f& A, const cv::P
 // •	Rotate so it becomes the start
 // •	Polyline becomes open
 //
-// 1.  Find the closest point on the entire closed polyline, considering:
-//     o   Distances to vertices
-//     o   Distances to segments (projected point)
-// 2.  If the closest vertex is within the user supplied tolerance, split at that vertex.
-// 3.  Otherwise, split at the closest point on the closest segment (inserting a new point).
-// 4.  Rotate the polyline so the split point becomes index 0.
-// 5.  Remove the closing duplicate if present.
-
-std::vector<cv::Point2f> OpenCVTools::splitClosedPolylineAtClosest(const std::vector<cv::Point2f>& closedPoly, const cv::Point2f& userPoint, double vertexTolerance)
-{
-    const int N = closedPoly.size();
-    if (N < 2) return closedPoly;
-
-    // If last == first, ignore the duplicate for processing
-    bool hasClosingDup = (closedPoly.front() == closedPoly.back());
-    int M = hasClosingDup ? N - 1 : N;
-
-    // Track best candidate
-    double bestDist2 = std::numeric_limits<double>::max();
-    int bestVertex = -1;
-    int bestSeg = -1;
-    // double bestT = 0.0;
-    cv::Point2f bestPoint;
-
-    // 1. Check vertices
-    for (int i = 0; i < M; ++i) {
-        double d2 = dist2(closedPoly[i], userPoint);
-        if (d2 < bestDist2) {
-            bestDist2 = d2;
-            bestVertex = i;
-            bestSeg = -1;
-            bestPoint = closedPoly[i];
-        }
-    }
-
-    // 2. Check segments
-    for (int i = 0; i < M; ++i) {
-        int j = (i + 1) % M;
-        double t;
-        cv::Point2f cp = closestPointOnSegment(closedPoly[i], closedPoly[j], userPoint, t);
-        double d2 = dist2(cp, userPoint);
-        if (d2 < bestDist2) {
-            bestDist2 = d2;
-            bestVertex = -1;
-            bestSeg = i;
-            // bestT = t;
-            bestPoint = cp;
-        }
-    }
-
-    // 3. Decide: vertex or edge?
-    std::vector<cv::Point2f> result;
-
-    if (bestVertex >= 0 && std::sqrt(bestDist2) <= vertexTolerance) {
-        // Split at vertex
-        result.reserve(M);
-        for (int k = 0; k < M; ++k) {
-            result.push_back(closedPoly[(bestVertex + k) % M]);
-        }
-    } else {
-        // Split at edge: insert new point
-        int i = bestSeg;
-        // int j = (i + 1) % M;
-
-        // Build new polyline with inserted point
-        std::vector<cv::Point2f> temp;
-        temp.reserve(M + 1);
-
-        for (int k = 0; k < M; ++k) {
-            temp.push_back(closedPoly[k]);
-            if (k == i) {
-                temp.push_back(bestPoint); // Insert split point
-            }
-        }
-
-        // Now rotate so split point is first
-        int splitIdx = i + 1; // inserted point index
-        int newSize = temp.size();
-        result.reserve(newSize);
-
-        for (int k = 0; k < newSize; ++k) {
-            result.push_back(temp[(splitIdx + k) % newSize]);
-        }
-    }
-
-    return result; // Open polyline
-}
-
-// Split a closed polyline based on a user point:
-//
 // This is a version that is robust for:
 // •   Self intersecting contours (figure 8, bow ties, spirals, etc.)
 // •   Contours with repeated vertices
@@ -416,8 +325,9 @@ std::vector<cv::Point2f> OpenCVTools::splitClosedPolylineAtClosest(const std::ve
 // 5.  Rotate the sequence so the split point becomes index 0.
 // 6.  Do not attempt to “fix” or reorder self intersections — preserve the original order exactly.
 
-std::vector<cv::Point2f> OpenCVTools::splitClosedPolylineRobust(const std::vector<cv::Point2f>& closedPoly, const cv::Point2f& userPoint, double vertexTolerance)
+std::vector<cv::Point2f> OpenCVTools::splitClosedPolylineRobust(const std::vector<cv::Point2f>& closedPoly, const cv::Point2f& userPoint, float vertexTolerance)
 {
+    std::vector<cv::Point2f> result;
     const int N = closedPoly.size();
     if (N < 2) return closedPoly;
 
@@ -426,71 +336,99 @@ std::vector<cv::Point2f> OpenCVTools::splitClosedPolylineRobust(const std::vecto
     int M = hasClosingDup ? N - 1 : N;
 
     // Best candidate tracking
-    double bestDist2 = std::numeric_limits<double>::max();
+    float bestDist2 = std::numeric_limits<float>::max();
     int bestVertex = -1;
-    int bestSeg = -1;
-    double bestT = 0.0;
+    float bestT = 0.0f;
     cv::Point2f bestPoint;
 
-    // --- 1. Check vertices ---
-    for (int i = 0; i < M; ++i) {
-        double d2 = dist2(closedPoly[i], userPoint);
-        if (d2 < bestDist2) {
+    // --- 1. Check vertices first ---
+    for (int i = 0; i < M; ++i)
+    {
+        float d2 = dist2(closedPoly[i], userPoint);
+        if (d2 < bestDist2)
+        {
             bestDist2 = d2;
             bestVertex = i;
-            bestSeg = -1;
             bestPoint = closedPoly[i];
         }
     }
+    if (bestVertex >= 0 && std::sqrt(bestDist2) <= vertexTolerance) // and if less than the threshold split at point
+    {
+        // Split at vertex
+        result.reserve(M);
+        for (int k = 0; k < M; ++k)
+        {
+            result.push_back(closedPoly[(bestVertex + k) % M]);
+        }
+        if (result.front() != result.back()) // Add the first point to the end if necessary
+        {
+            result.push_back(result.front());
+        }
+        return result;
+    }
 
+    bestDist2 = std::numeric_limits<float>::max();
+    int bestSeg = -1;
     // --- 2. Check segments ---
-    for (int i = 0; i < M; ++i) {
+    for (int i = 0; i < M; ++i)
+    {
         int j = (i + 1) % M;
-        double t;
+        float t;
         cv::Point2f cp = closestPointOnSegment(closedPoly[i], closedPoly[j], userPoint, t);
-        double d2 = dist2(cp, userPoint);
-        if (d2 < bestDist2) {
+        float d2 = dist2(cp, userPoint);
+        if (d2 < bestDist2)
+        {
             bestDist2 = d2;
-            bestVertex = -1;
             bestSeg = i;
             bestT = t;
             bestPoint = cp;
         }
     }
 
-    // --- 3. Decide: vertex or edge ---
-    std::vector<cv::Point2f> result;
-
-    if (bestVertex >= 0 && std::sqrt(bestDist2) <= vertexTolerance) {
+    // --- 3. If closest point is a vertex then split and do not create an extra point
+    if (bestT < std::numeric_limits<float>::epsilon() || bestT > (1.0f - std::numeric_limits<float>::epsilon()))
+    {
         // Split at vertex
+        bestVertex = (bestT < std::numeric_limits<float>::epsilon()) ? bestSeg : (bestSeg + 1) % M;
         result.reserve(M);
-        for (int k = 0; k < M; ++k) {
+        for (int k = 0; k < M; ++k)
+        {
             result.push_back(closedPoly[(bestVertex + k) % M]);
+        }
+        if (result.front() != result.back()) // Add the first point to the end if necessary
+        {
+            result.push_back(result.front());
         }
         return result;
     }
 
     // --- 4. Split at edge (insert new point) ---
-    int i = bestSeg;
-    int j = (i + 1) % M;
 
     std::vector<cv::Point2f> temp;
     temp.reserve(M + 1);
 
-    for (int k = 0; k < M; ++k) {
+    for (int k = 0; k < M; ++k)
+    {
         temp.push_back(closedPoly[k]);
-        if (k == i) {
+        if (k == bestSeg)
+        {
             temp.push_back(bestPoint); // Insert split point
         }
     }
 
     // --- 5. Rotate so split point is first ---
-    int splitIdx = i + 1;
+    int splitIdx = bestSeg + 1;
     int newSize = temp.size();
     result.reserve(newSize);
-
-    for (int k = 0; k < newSize; ++k) {
+    for (int k = 0; k < newSize; ++k)
+    {
         result.push_back(temp[(splitIdx + k) % newSize]);
+    }
+
+    // --- 6. Add the first point to the end if necessary
+    if (result.front() != result.back())
+    {
+        result.push_back(result.front());
     }
 
     return result;
@@ -507,63 +445,75 @@ std::vector<cv::Point2f> OpenCVTools::splitClosedPolylineRobust(const std::vecto
 // 3.  Otherwise → split at the closest point on the closest segment, inserting a new point.
 // This version is robust for self intersecting open polylines because it never assumes any topology — it only uses the index order.
 
-void OpenCVTools::splitOpenPolylineRobust(const std::vector<cv::Point2f>& poly, const cv::Point2f& userPoint, double vertexTolerance, std::vector<cv::Point2f>& polyA, std::vector<cv::Point2f>& polyB)
+void OpenCVTools::splitOpenPolylineRobust(const std::vector<cv::Point2f>& poly, const cv::Point2f& userPoint, float vertexTolerance, std::vector<cv::Point2f>& polyA, std::vector<cv::Point2f>& polyB)
 {
     const int N = poly.size();
     polyA.clear();
     polyB.clear();
 
-    if (N < 2) {
+    if (N < 2)
+    {
         polyA = poly;
         return;
     }
 
-    double bestDist2 = std::numeric_limits<double>::max();
+    float bestDist2 = std::numeric_limits<float>::max();
     int bestVertex = -1;
-    int bestSeg = -1;
-    // double bestT = 0.0;
+    float bestT = 0.0;
     cv::Point2f bestPoint;
 
-    // Check vertices
-    for (int i = 0; i < N; ++i) {
-        double d2 = dist2(poly[i], userPoint);
-        if (d2 < bestDist2) {
+    // Check vertices first
+    for (int i = 0; i < N; ++i)
+    {
+        float d2 = dist2(poly[i], userPoint);
+        if (d2 < bestDist2)
+        {
             bestDist2 = d2;
             bestVertex = i;
-            bestSeg = -1;
             bestPoint = poly[i];
-            // bestT = 0.0;
         }
+    }
+    // Split at vertex
+    if (bestVertex >= 0 && std::sqrt(bestDist2) <= vertexTolerance)
+    {
+        polyA.insert(polyA.end(), poly.begin(), poly.begin() + bestVertex + 1);
+        polyB.insert(polyB.end(), poly.begin() + bestVertex, poly.end());
+        return;
     }
 
     // Check segments
-    for (int i = 0; i < N - 1; ++i) {
-        double t;
+    int bestSeg = -1;
+    bestDist2 = std::numeric_limits<float>::max();
+    for (int i = 0; i < N - 1; ++i)
+    {
+        float t;
         cv::Point2f cp = closestPointOnSegment(poly[i], poly[i+1], userPoint, t);
-        double d2 = dist2(cp, userPoint);
-        if (d2 < bestDist2) {
+        float d2 = dist2(cp, userPoint);
+        if (d2 < bestDist2)
+        {
             bestDist2 = d2;
-            bestVertex = -1;
             bestSeg = i;
-            // bestT = t;
+            bestT = t;
             bestPoint = cp;
         }
     }
 
-    // Split at vertex
-    if (bestVertex >= 0 && std::sqrt(bestDist2) <= vertexTolerance) {
+    // If closest point is a vertex then split and do not create an extra point
+    if (bestT < std::numeric_limits<float>::epsilon() || bestT > (1.0f - std::numeric_limits<float>::epsilon()))
+    {
+        // Split at vertex
+        bestVertex = (bestT < std::numeric_limits<float>::epsilon()) ? bestSeg : (bestSeg + 1);
         polyA.insert(polyA.end(), poly.begin(), poly.begin() + bestVertex + 1);
         polyB.insert(polyB.end(), poly.begin() + bestVertex, poly.end());
         return;
     }
 
     // Split at segment (insert new point)
-    int i = bestSeg;
-
-    polyA.insert(polyA.end(), poly.begin(), poly.begin() + i + 1);
+    bestVertex = bestSeg;
+    polyA.insert(polyA.end(), poly.begin(), poly.begin() + bestVertex + 1);
     polyA.push_back(bestPoint);
 
     polyB.push_back(bestPoint);
-    polyB.insert(polyB.end(), poly.begin() + i + 1, poly.end());
+    polyB.insert(polyB.end(), poly.begin() + bestVertex + 1, poly.end());
 }
 

@@ -146,15 +146,14 @@ void MainWindow::straighten()
 
     QGraphicsPathItem *item;
     item = new QGraphicsPathItem(OpenCVTools::convertPolylineToQPainterPath(polyA, false));
-    item->setPen(QPen(Qt::magenta, 2));
+    item->setPen(QPen(Qt::cyan, 2));
     item->setBrush(Qt::NoBrush);
     m_view->addItem(item);
     item = new QGraphicsPathItem(OpenCVTools::convertPolylineToQPainterPath(polyB, false));
-    item->setPen(QPen(Qt::yellow, 2));
+    item->setPen(QPen(Qt::magenta, 2));
     item->setBrush(Qt::NoBrush);
     m_view->addItem(item);
 
-    m_view->setOutline(item);
     updateUI();
 }
 

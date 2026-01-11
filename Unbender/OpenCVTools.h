@@ -33,15 +33,13 @@ public:
 
     static std::string qImageInfoToString(const QImage& img, const std::string& name = "QImage");
 
-    static double dist2(const cv::Point2f& a, const cv::Point2f& b);
+    static float dist2(const cv::Point2f& a, const cv::Point2f& b);
 
-    static cv::Point2f closestPointOnSegment(const cv::Point2f& A, const cv::Point2f& B, const cv::Point2f& P, double& tOut);
+    static cv::Point2f closestPointOnSegment(const cv::Point2f& A, const cv::Point2f& B, const cv::Point2f& P, float& tOut);
 
-    static std::vector<cv::Point2f> splitClosedPolylineAtClosest(const std::vector<cv::Point2f>& closedPoly, const cv::Point2f& userPoint, double vertexTolerance);
+    static std::vector<cv::Point2f> splitClosedPolylineRobust(const std::vector<cv::Point2f>& closedPoly, const cv::Point2f& userPoint, float vertexTolerance);
 
-    static std::vector<cv::Point2f> splitClosedPolylineRobust(const std::vector<cv::Point2f>& closedPoly, const cv::Point2f& userPoint, double vertexTolerance);
-
-    static void splitOpenPolylineRobust(const std::vector<cv::Point2f>& poly, const cv::Point2f& userPoint, double vertexTolerance, std::vector<cv::Point2f>& polyA, std::vector<cv::Point2f>& polyB);
+    static void splitOpenPolylineRobust(const std::vector<cv::Point2f>& poly, const cv::Point2f& userPoint, float vertexTolerance, std::vector<cv::Point2f>& polyA, std::vector<cv::Point2f>& polyB);
 
 };
 
