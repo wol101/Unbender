@@ -158,12 +158,19 @@ void MainWindow::straighten()
     size_t segments = 100;
     std::vector<cv::Point2f> centreLine;
     centreLine.reserve(segments + 1);
+    std::vector<cv::Point2f> stick(2);
     for (size_t i = 0; i < segments + 1; ++i)
     {
         float t = float(i) / 100.0f;
         cv::Point2f a = OpenCVTools::pointAtProportion(polyA, t);
         cv::Point2f b = OpenCVTools::pointAtProportion(polyB, t);
         centreLine.push_back(cv::Point2f(0.5f * (a.x + b.x), 0.5f * (a.y + b.y)));
+
+        stick[0] = a; stick[1] = b;
+        item = new QGraphicsPathItem(OpenCVTools::convertPolylineToQPainterPath(stick, false));
+        item->setPen(QPen(Qt::darkYellow, 1));
+        item->setBrush(Qt::NoBrush);
+        m_view->addItem(item);
     }
 
     item = new QGraphicsPathItem(OpenCVTools::convertPolylineToQPainterPath(centreLine, false));
