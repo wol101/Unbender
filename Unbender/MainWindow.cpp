@@ -186,6 +186,8 @@ void MainWindow::straightenMore()
     std::vector<cv::Point2f> segmentNormals;
     std::vector<cv::Point2f> vertexNormals;
     OpenCVTools::computeNormals(m_centreLine, closed, leftNormals, segmentNormals, vertexNormals);
+    std::vector<cv::Point2f> newCentreLine;
+    newCentreLine.reserve(m_centreLine.size());
 
     QGraphicsPathItem *item;
     std::vector<cv::Point2f> stick(2);
@@ -202,11 +204,19 @@ void MainWindow::straightenMore()
         OpenCVTools::intersectRayWithPolylineDeterministic(m_polyB, rayOrigin, rayDir, closed, outHits, eps);
         if (outHits.size() == 0) continue;
         stick[1] = outHits[0].point;
+        newCentreLine.push_back(OpenCVTools::pointAtProportion(stick, 0.5));
         item = new QGraphicsPathItem(OpenCVTools::convertPolylineToQPainterPath(stick, false));
         item->setPen(QPen(Qt::green, 1));
         item->setBrush(Qt::NoBrush);
         m_view->addItem(item);
     }
+
+    item = new QGraphicsPathItem(OpenCVTools::convertPolylineToQPainterPath(newCentreLine, false));
+    item->setPen(QPen(Qt::green, 1));
+    item->setBrush(Qt::NoBrush);
+    m_view->addItem(item);
+
+    m_centreLine = newCentreLine;
 
     updateUI();
 }
