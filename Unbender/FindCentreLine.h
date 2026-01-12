@@ -12,6 +12,8 @@ public:
 
     void straightenMore();
 
+    void createStraightVersion();
+
     void setImg(const cv::Mat &newImg);
 
     void setUserPoint1(cv::Point2f newUserPoint1);
@@ -40,6 +42,9 @@ private:
     cv::Point2f m_userPoint2;
 
     std::vector<std::vector<cv::Point2f> > m_stickList;
+
+    std::vector<cv::Point2f> m_straightLine;
+    std::vector<std::vector<cv::Point2f> > m_straigthStickList;
 };
 
 #endif // FINDCENTRELINE_H

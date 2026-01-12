@@ -66,6 +66,25 @@ void FindCentreLine::straightenMore()
     m_centreLine = newCentreLine;
 }
 
+void FindCentreLine::createStraightVersion()
+{
+    m_straightLine.clear();
+    m_straigthStickList.clear();
+    m_straightLine.reserve(m_centreLine.size());
+    m_straigthStickList.reserve(m_stickList.size());
+    m_straightLine.push_back({0.0f, 0.0f});
+    for (size_t i = 0; i < m_centreLine.size() - 1; ++i)
+    {
+        float len = cv::norm(m_centreLine[i + 1] - m_centreLine[i]);
+        m_straightLine.push_back({m_straightLine[i].x + len, 0.0f});
+    }
+    for (size_t i = 0; i < m_stickList.size() - 1; ++i)
+    {
+        float len = cv::norm(m_centreLine[i + 1] - m_centreLine[i]);
+        m_straightLine.push_back({m_straightLine[i].x + len, 0.0f});
+    }
+}
+
 void FindCentreLine::setImg(const cv::Mat &newImg)
 {
     m_img = newImg;

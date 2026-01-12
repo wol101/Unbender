@@ -161,6 +161,9 @@ void MainWindow::straighten()
 
     m_findCentreLine.straighten();
 
+    QImage thresholdImage = OpenCVTools::convertMatToQImage(m_findCentreLine.thresh());
+    m_view->setImage(new QGraphicsPixmapItem(QPixmap::fromImage(thresholdImage)));
+
     QGraphicsPathItem *item;
     item = new QGraphicsPathItem(OpenCVTools::convertPolylineToQPainterPath(m_findCentreLine.polyA(), false));
     item->setPen(QPen(Qt::cyan, 2));
@@ -184,9 +187,6 @@ void MainWindow::straighten()
     item->setPen(QPen(Qt::yellow, 2));
     item->setBrush(Qt::NoBrush);
     m_view->addExtraItem(item);
-
-    QImage thresholdImage = OpenCVTools::convertMatToQImage(m_findCentreLine.thresh());
-    m_view->setImage(new QGraphicsPixmapItem(QPixmap::fromImage(thresholdImage)));
 
     updateUI();
 }
