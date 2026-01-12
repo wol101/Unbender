@@ -4,6 +4,8 @@
 #include <QPainterPath>
 #include <QDebug>
 
+#include <sstream>
+
 OpenCVTools::OpenCVTools() {}
 
 // routine to convert QImage to OpenCV image
@@ -303,14 +305,14 @@ cv::Point2f OpenCVTools::closestPointOnSegment(const cv::Point2f& A, const cv::P
 // Split a closed polyline based on a user point:
 //
 // If user point is close to a vertex:
-// •	Within vertexTolerance → split at that vertex
-// •	No new point inserted
-// •	Polyline starts at that vertex
+// •    Within vertexTolerance → split at that vertex
+// •    No new point inserted
+// •    Polyline starts at that vertex
 // Otherwise:
-// •	Compute closest point on the closest segment
-// •	Insert that point
-// •	Rotate so it becomes the start
-// •	Polyline becomes open
+// •    Compute closest point on the closest segment
+// •    Insert that point
+// •    Rotate so it becomes the start
+// •    Polyline becomes open
 //
 // This is a version that is robust for:
 // •   Self intersecting contours (figure 8, bow ties, spirals, etc.)
@@ -635,6 +637,22 @@ bool OpenCVTools::segmentIntersection(const cv::Point2f& A, const cv::Point2f& B
     return false;
 }
 
+cv::Point2f OpenCVTools::normalize(const cv::Point2f& v)
+{
+    float len = std::sqrt(v.x*v.x + v.y*v.y);
+    if (len == 0.0f)
+        return cv::Point2f(0.0f, 0.0f);
+    return cv::Point2f(v.x/len, v.y/len);
+}
+
+cv::Point3f OpenCVTools::normalize(const cv::Point3f& v)
+{
+    float len = std::sqrt(v.x*v.x + v.y*v.y + v.z*v.z);
+    if (len == 0.0f) return cv::Point3f(0,0,0);
+    return cv::Point3f(v.x/len, v.y/len, v.z/len);
+}
+
+
 // Segment + Vertex Normals for polyline
 // •   supports open/closed and left/right normal policies
 // Segment normals
@@ -660,15 +678,6 @@ void OpenCVTools::computeNormals(const std::vector<cv::Point2f>& polyline, bool 
 
     segmentNormals.resize(segmentCount);
     vertexNormals.assign(n, cv::Point2f(0.0f, 0.0f));
-
-    // Embedded normalization lambda function
-    static auto normalize = [](const cv::Point2f& v) -> cv::Point2f
-    {
-        float len = std::sqrt(v.x*v.x + v.y*v.y);
-        if (len == 0.0f)
-            return cv::Point2f(0.0f, 0.0f);
-        return cv::Point2f(v.x/len, v.y/len);
-    };
 
     // --- Compute segment normals ---
     for (size_t i = 0; i < segmentCount; ++i)
@@ -819,3 +828,232 @@ void OpenCVTools::intersectRayWithPolylineDeterministic(const std::vector<cv::Po
 
     outHits.swap(merged);
 }
+
+
+cv::Point3f OpenCVTools::rotateAroundAxis(const cv::Point3f& p, const cv::Point3f& axisPoint, const cv::Point3f& axisDirNorm, float angle)
+{
+    // Rodrigues' rotation formula
+    cv::Point3f v = p - axisPoint;
+    float c = std::cos(angle);
+    float s = std::sin(angle);
+    cv::Point3f k = axisDirNorm;
+
+    cv::Point3f v_rot =
+        v * c +
+        k.cross(v) * s +
+        k * (k.dot(v)) * (1.0f - c);
+
+    return axisPoint + v_rot;
+}
+
+// Full Solid of Revolution Generator
+// •    Optional caps (top and bottom)
+// •    Vertex normals (smooth shading)
+// •    UV coordinates (for texturing)
+// •    Arbitrary axis of revolution
+// •    OpenCV polyline input
+// •    Triangle mesh output
+// ✔ Side surface
+// •    Full revolution
+// •    Smooth normals
+// •    UVs in [0,1] × [0,1]
+// •    Deterministic triangle layout
+// ✔ Caps (optional)
+// •    Center vertex + ring
+// •    Correct normal direction
+// •    Circular UV mapping
+// ✔ Axis of revolution
+// Any axis defined by:
+// cv::Point3f axisPoint;
+// cv::Point3f axisDir;
+
+
+OpenCVTools::Mesh OpenCVTools::revolvePolyline(const std::vector<cv::Point2f>& polyline2D, const cv::Point3f& axisPoint, const cv::Point3f& axisDir, int slices, bool capStart, bool capEnd)
+{
+    Mesh mesh;
+
+    if (polyline2D.size() < 2 || slices < 3)
+        return mesh;
+
+    // Convert to 3D
+    std::vector<cv::Point3f> polyline;
+    polyline.reserve(polyline2D.size());
+    for (auto& p : polyline2D)
+        polyline.emplace_back(p.x, p.y, 0.0f);
+
+    int n = polyline.size();
+    cv::Point3f axisDirNorm = normalize(axisDir);
+    float dtheta = 2.0f * float(M_PI) / float(slices);
+
+    // Reserve memory
+    mesh.vertices.reserve(n * slices + (capStart ? slices+1 : 0) + (capEnd ? slices+1 : 0));
+    mesh.normals.reserve(mesh.vertices.capacity());
+    mesh.uvs.reserve(mesh.vertices.capacity());
+
+    // --- Generate side vertices, normals, UVs ---
+    for (int s = 0; s < slices; ++s)
+    {
+        float angle = s * dtheta;
+        float u = float(s) / float(slices - 1);
+
+        for (int i = 0; i < n; ++i)
+        {
+            cv::Point3f p = polyline[i];
+            cv::Point3f pr = rotateAroundAxis(p, axisPoint, axisDirNorm, angle);
+
+            mesh.vertices.push_back(pr);
+
+            // Normal = derivative wrt angle (tangent around axis)
+            cv::Point3f tangent = rotateAroundAxis(p, axisPoint, axisDirNorm, angle + 0.001f) - pr;
+            mesh.normals.push_back(normalize(tangent));
+
+            float v = float(i) / float(n - 1);
+            mesh.uvs.emplace_back(u, v);
+        }
+    }
+
+    // --- Generate side triangles ---
+    for (int s = 0; s < slices; ++s)
+    {
+        int sNext = (s + 1) % slices;
+
+        for (int i = 0; i < n - 1; ++i)
+        {
+            int i0 = s * n + i;
+            int i1 = s * n + (i + 1);
+            int i2 = sNext * n + i;
+            int i3 = sNext * n + (i + 1);
+
+            mesh.triangles.emplace_back(i0, i2, i1);
+            mesh.triangles.emplace_back(i1, i2, i3);
+        }
+    }
+
+    // --- Caps (optional) ---
+    auto addCap = [&](bool atStart)
+    {
+        int baseIndex = mesh.vertices.size();
+        int ringStart = atStart ? 0 : (n - 1);
+
+        // Center vertex
+        cv::Point3f center = polyline[ringStart];
+        center = rotateAroundAxis(center, axisPoint, axisDirNorm, 0);
+        mesh.vertices.push_back(center);
+
+        cv::Point3f capNormal = atStart ? -axisDirNorm : axisDirNorm;
+        mesh.normals.push_back(capNormal);
+        mesh.uvs.emplace_back(0.5f, 0.5f);
+
+        int centerIndex = baseIndex;
+
+        // Ring vertices
+        for (int s = 0; s < slices; ++s)
+        {
+            float angle = s * dtheta;
+            cv::Point3f p = polyline[ringStart];
+            cv::Point3f pr = rotateAroundAxis(p, axisPoint, axisDirNorm, angle);
+
+            mesh.vertices.push_back(pr);
+            mesh.normals.push_back(capNormal);
+
+            float u = 0.5f + 0.5f * std::cos(angle);
+            float v = 0.5f + 0.5f * std::sin(angle);
+            mesh.uvs.emplace_back(u, v);
+        }
+
+        // Triangles
+        for (int s = 0; s < slices; ++s)
+        {
+            int sNext = (s + 1) % slices;
+            int i0 = centerIndex;
+            int i1 = baseIndex + 1 + s;
+            int i2 = baseIndex + 1 + sNext;
+
+            if (atStart)
+                mesh.triangles.emplace_back(i0, i2, i1);
+            else
+                mesh.triangles.emplace_back(i0, i1, i2);
+        }
+    };
+
+    if (capStart) addCap(true);
+    if (capEnd)   addCap(false);
+
+    return mesh;
+}
+
+// Produce an OBJ formatted string from a mesh. It follows the OBJ spec precisely:
+// •    v → vertex
+// •    vt → texture coordinate
+// •    vn → normal
+// •    f → face (1 indexed, with v/vt/vn triplets)
+// It works even if UVs or normals are missing.
+
+
+std::string OpenCVTools::meshToOBJ(const OpenCVTools::Mesh& mesh, const std::string& objectName)
+{
+    std::ostringstream out;
+
+    out << "o " << objectName << "\n";
+
+    // --- Vertices ---
+    for (const auto& v : mesh.vertices)
+        out << "v " << v.x << " " << v.y << " " << v.z << "\n";
+
+    // --- UVs ---
+    bool hasUV = !mesh.uvs.empty();
+    if (hasUV)
+    {
+        for (const auto& uv : mesh.uvs)
+            out << "vt " << uv.x << " " << uv.y << "\n";
+    }
+
+    // --- Normals ---
+    bool hasNormals = !mesh.normals.empty();
+    if (hasNormals)
+    {
+        for (const auto& n : mesh.normals)
+            out << "vn " << n.x << " " << n.y << " " << n.z << "\n";
+    }
+
+    // --- Faces ---
+    // OBJ is 1-indexed
+    for (const auto& tri : mesh.triangles)
+    {
+        int i0 = tri[0] + 1;
+        int i1 = tri[1] + 1;
+        int i2 = tri[2] + 1;
+
+        if (hasUV && hasNormals)
+        {
+            out << "f "
+                << i0 << "/" << i0 << "/" << i0 << " "
+                << i1 << "/" << i1 << "/" << i1 << " "
+                << i2 << "/" << i2 << "/" << i2 << "\n";
+        }
+        else if (hasUV)
+        {
+            out << "f "
+                << i0 << "/" << i0 << " "
+                << i1 << "/" << i1 << " "
+                << i2 << "/" << i2 << "\n";
+        }
+        else if (hasNormals)
+        {
+            out << "f "
+                << i0 << "//" << i0 << " "
+                << i1 << "//" << i1 << " "
+                << i2 << "//" << i2 << "\n";
+        }
+        else
+        {
+            out << "f "
+                << i0 << " "
+                << i1 << " "
+                << i2 << "\n";
+        }
+    }
+
+    return out.str();
+}
+

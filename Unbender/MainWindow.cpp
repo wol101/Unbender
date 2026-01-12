@@ -2,6 +2,7 @@
 #include "./ui_MainWindow.h"
 
 #include "GraphicsView.h"
+#include "MeshViewWidget.h"
 #include "OpenCVTools.h"
 #include "MarkerItem.h"
 
@@ -15,6 +16,8 @@
 #include <QWheelEvent>
 #include <QSettings>
 #include <QMessageBox>
+#include <QHBoxLayout>
+#include <QSplitter>
 
 
 MainWindow::MainWindow(QWidget *parent)
@@ -23,9 +26,32 @@ MainWindow::MainWindow(QWidget *parent)
 {
     m_ui->setupUi(this);
 
-    QGraphicsScene *scene = new QGraphicsScene(this);
-    m_view = new GraphicsView(scene, this);
-    setCentralWidget(m_view);
+    // Central widget container
+    QWidget* central = new QWidget(this);
+    setCentralWidget(central);
+
+    // Layout for the central widget
+    QHBoxLayout* layout = new QHBoxLayout(central);
+    layout->setContentsMargins(0, 0, 0, 0);
+
+    // Horizontal splitter
+    QSplitter* splitter = new QSplitter(Qt::Horizontal, central);
+    layout->addWidget(splitter);
+
+    // Left side: customised GraphicsView
+    QGraphicsScene* scene = new QGraphicsScene(this);
+    GraphicsView* m_view = new GraphicsView(scene);
+
+    // Right side: your custom OpenGL widget
+    MeshViewWidget* meshView = new MeshViewWidget;
+
+    // Add widgets to splitter
+    splitter->addWidget(m_view);
+    splitter->addWidget(meshView);
+
+    // Optional: set initial sizes
+    splitter->setStretchFactor(0, 1);  // graphics view grows
+    splitter->setStretchFactor(1, 1);  // mesh view grows
 
     connect(m_ui->actionOpen, &QAction::triggered, this, &MainWindow::openImage);
     connect(m_ui->actionStraighten, &QAction::triggered, this, &MainWindow::straighten);

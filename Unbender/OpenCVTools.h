@@ -5,7 +5,8 @@
 
 #include <QImage>
 
-#include <tuple>
+#include <string>
+
 
 class OpenCVTools
 {
@@ -18,6 +19,14 @@ public:
         float t;               // ray parameter (signed)
         float u;               // segment parameter [0,1]
         size_t segmentIndex;   // which segment was hit
+    };
+
+    struct Mesh
+    {
+        std::vector<cv::Point3f> vertices;
+        std::vector<cv::Point3f> normals;
+        std::vector<cv::Point2f> uvs;
+        std::vector<cv::Vec3i>   triangles;
     };
 
     static cv::Mat convertQImageToMat(const QImage &img);
@@ -55,11 +64,18 @@ public:
 
     static bool segmentIntersection(const cv::Point2f& A, const cv::Point2f& B, const cv::Point2f& C, const cv::Point2f& D, cv::Point2f& out);
 
+    static cv::Point2f normalize(const cv::Point2f& v);
+    static cv::Point3f normalize(const cv::Point3f& v);
+
     static void computeNormals(const std::vector<cv::Point2f>& polyline, bool closed, bool leftNormals, std::vector<cv::Point2f>& segmentNormals, std::vector<cv::Point2f>& vertexNormals);
 
-    static bool intersectRayWithPolyline(const std::vector<cv::Point2f>& polyline, const cv::Point2f& rayOrigin, const cv::Point2f& rayDir,  bool closed, cv::Point2f& outPoint, size_t& outSegmentIndex);
-
     static void intersectRayWithPolylineDeterministic(const std::vector<cv::Point2f>& polyline, const cv::Point2f& rayOrigin, const cv::Point2f& rayDir, bool closed, std::vector<OpenCVTools::RayHit>& outHits, float eps = 1e-6);
+
+    static cv::Point3f rotateAroundAxis(const cv::Point3f& p, const cv::Point3f& axisPoint, const cv::Point3f& axisDirNorm, float angle);
+
+    static OpenCVTools::Mesh revolvePolyline(const std::vector<cv::Point2f>& polyline2D, const cv::Point3f& axisPoint, const cv::Point3f& axisDir, int slices, bool capStart, bool capEnd);
+
+    static std::string meshToOBJ(const OpenCVTools::Mesh& mesh, const std::string& objectName = "mesh");
 
 };
 
