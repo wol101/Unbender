@@ -194,16 +194,16 @@ void MainWindow::straightenMore()
         cv::Point2f rayOrigin =  m_centreLine[i];
         cv::Point2f rayDir =  vertexNormals[i];
         bool closed = false;
-        cv::Point2f outPoint;
-        size_t outSegmentIndex;
-        bool found = OpenCVTools::intersectRayWithPolyline(m_polyA, rayOrigin, rayDir,  closed, outPoint, outSegmentIndex);
-        if (!found) continue;
-        stick[0] = outPoint;
-        found = OpenCVTools::intersectRayWithPolyline(m_polyB, rayOrigin, rayDir,  closed, outPoint, outSegmentIndex);
-        if (!found) continue;
-        stick[1] = outPoint;
+        std::vector<OpenCVTools::RayHit> outHits;
+        float eps = std::numeric_limits<float>::epsilon();
+        OpenCVTools::intersectRayWithPolylineDeterministic(m_polyA, rayOrigin, rayDir, closed, outHits, eps);
+        if (outHits.size() == 0) continue;
+        stick[0] = outHits[0].point;
+        OpenCVTools::intersectRayWithPolylineDeterministic(m_polyB, rayOrigin, rayDir, closed, outHits, eps);
+        if (outHits.size() == 0) continue;
+        stick[1] = outHits[0].point;
         item = new QGraphicsPathItem(OpenCVTools::convertPolylineToQPainterPath(stick, false));
-        item->setPen(QPen(Qt::darkGreen, 1));
+        item->setPen(QPen(Qt::green, 1));
         item->setBrush(Qt::NoBrush);
         m_view->addItem(item);
     }

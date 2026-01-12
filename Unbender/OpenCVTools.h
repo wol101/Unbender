@@ -12,6 +12,14 @@ class OpenCVTools
 public:
     OpenCVTools();
 
+    struct RayHit
+    {
+        cv::Point2f point;     // intersection point
+        float t;               // ray parameter (signed)
+        float u;               // segment parameter [0,1]
+        size_t segmentIndex;   // which segment was hit
+    };
+
     static cv::Mat convertQImageToMat(const QImage &img);
 
     static QImage convertMatToQImage(const cv::Mat &mat);
@@ -50,6 +58,8 @@ public:
     static void computeNormals(const std::vector<cv::Point2f>& polyline, bool closed, bool leftNormals, std::vector<cv::Point2f>& segmentNormals, std::vector<cv::Point2f>& vertexNormals);
 
     static bool intersectRayWithPolyline(const std::vector<cv::Point2f>& polyline, const cv::Point2f& rayOrigin, const cv::Point2f& rayDir,  bool closed, cv::Point2f& outPoint, size_t& outSegmentIndex);
+
+    static void intersectRayWithPolylineDeterministic(const std::vector<cv::Point2f>& polyline, const cv::Point2f& rayOrigin, const cv::Point2f& rayDir, bool closed, std::vector<OpenCVTools::RayHit>& outHits, float eps = 1e-6);
 
 };
 

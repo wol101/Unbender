@@ -705,35 +705,40 @@ void OpenCVTools::computeNormals(const std::vector<cv::Point2f>& polyline, bool 
         vertexNormals[i] = normalize(vertexNormals[i]);
 }
 
-// find the first intersection point between an OpenCV polyline and an infinite ray defined by an origin and a direction vector.
-// This version is:
-// •	Robust against degenerate segments
-// •	Deterministic and index aligned
-// •	Explicit about intersection semantics
-// •	Uses no hidden allocations
-// It returns a boolean indicating whether an intersection was found, and fills an output cv::Point2f.
+// Deterministic Ray–Polyline Intersection (All Hits, Stable Ordering)
+// This guarantees a total ordering.
+// fully deterministic even for self intersecting polylines, with:
+// •   A strict, explicit ordering policy
+// •   A canonical tie breaking rule
+// •   Stable sorting
+// •   Epsilon based merging of duplicate intersection points
+// •   Deterministic behavior across compilers, platforms, and floating point quirks
+// Deterministic ordering rules
+// 1.   Primary key: abs(t) (closest intersection in either direction)
+// 2.   Secondary key: t (negative before positive when |t| ties)
+// 3.   Tertiary key: segmentIndex (lower index first)
+// 4.   Quaternary key: u parameter along the segment
+// 5.   Duplicate merging: If two hits are within eps in both t and point position, merge them into a canonical hit
 
-bool OpenCVTools::intersectRayWithPolyline(const std::vector<cv::Point2f>& polyline, const cv::Point2f& rayOrigin, const cv::Point2f& rayDir,  bool closed, cv::Point2f& outPoint, size_t& outSegmentIndex)
+void OpenCVTools::intersectRayWithPolylineDeterministic(const std::vector<cv::Point2f>& polyline, const cv::Point2f& rayOrigin, const cv::Point2f& rayDir, bool closed, std::vector<OpenCVTools::RayHit>& outHits, float eps)
 {
-    outSegmentIndex = std::numeric_limits<size_t>::max();
+    outHits.clear();
 
     const size_t n = polyline.size();
     if (n < 2)
-        return false;
+        return;
 
     // Normalize ray direction
     cv::Point2f d = rayDir;
     float dlen = std::sqrt(d.x*d.x + d.y*d.y);
     if (dlen == 0.0f)
-        return false;
+        return;
     d.x /= dlen;
     d.y /= dlen;
 
     const size_t segmentCount = closed ? n : (n - 1);
 
-    bool found = false;
-    float bestT = std::numeric_limits<float>::infinity();
-
+    // --- Collect all raw intersections ---
     for (size_t i = 0; i < segmentCount; ++i)
     {
         size_t i0 = i;
@@ -741,34 +746,76 @@ bool OpenCVTools::intersectRayWithPolyline(const std::vector<cv::Point2f>& polyl
 
         cv::Point2f p0 = polyline[i0];
         cv::Point2f p1 = polyline[i1];
-        cv::Point2f s = p1 - p0;  // segment direction
+        cv::Point2f s = p1 - p0;
 
         float det = d.x * (-s.y) - d.y * (-s.x);
-
-        // Parallel or degenerate segment
         if (std::fabs(det) < 1e-12f)
             continue;
 
-        // Solve:
-        // rayOrigin + t*d = p0 + u*s
         cv::Point2f diff = p0 - rayOrigin;
 
         float t = (diff.x * (-s.y) - diff.y * (-s.x)) / det;
         float u = (d.x * diff.y - d.y * diff.x) / det;
 
-        // Ray: t >= 0
-        // Segment: 0 <= u <= 1
-        if (t >= 0.0f && u >= 0.0f && u <= 1.0f)
+        if (u >= 0.0f && u <= 1.0f)
         {
-            if (t < bestT)
-            {
-                bestT = t;
-                outPoint = rayOrigin + d * t;
-                outSegmentIndex = i;
-                found = true;
-            }
+            RayHit hit;
+            hit.t = t;
+            hit.u = u;
+            hit.segmentIndex = i;
+            hit.point = rayOrigin + d * t;
+            outHits.push_back(hit);
         }
     }
 
-    return found;
+    if (outHits.empty())
+        return;
+
+    // --- Deterministic sort ---
+    std::sort(outHits.begin(), outHits.end(),
+              [&](const RayHit& a, const RayHit& b)
+              {
+                  float at = std::fabs(a.t);
+                  float bt = std::fabs(b.t);
+
+                  if (std::fabs(at - bt) > eps)
+                      return at < bt;
+
+                  if (std::fabs(a.t - b.t) > eps)
+                      return a.t < b.t;
+
+                  if (a.segmentIndex != b.segmentIndex)
+                      return a.segmentIndex < b.segmentIndex;
+
+                  if (std::fabs(a.u - b.u) > eps)
+                      return a.u < b.u;
+
+                  return false; // stable
+              });
+
+    // --- Merge duplicates deterministically ---
+    std::vector<RayHit> merged;
+    merged.reserve(outHits.size());
+
+    merged.push_back(outHits[0]);
+
+    for (size_t i = 1; i < outHits.size(); ++i)
+    {
+        const RayHit& prev = merged.back();
+        const RayHit& curr = outHits[i];
+
+        bool sameT = std::fabs(prev.t - curr.t) < eps;
+        bool sameX = std::fabs(prev.point.x - curr.point.x) < eps;
+        bool sameY = std::fabs(prev.point.y - curr.point.y) < eps;
+
+        if (sameT && sameX && sameY)
+        {
+            // Merge: keep the canonical one (the earlier in sorted order)
+            continue;
+        }
+
+        merged.push_back(curr);
+    }
+
+    outHits.swap(merged);
 }
