@@ -47,6 +47,9 @@ public:
 
     static bool segmentIntersection(const cv::Point2f& A, const cv::Point2f& B, const cv::Point2f& C, const cv::Point2f& D, cv::Point2f& out);
 
+    static void computeNormals(const std::vector<cv::Point2f>& polyline, bool closed, bool leftNormals, std::vector<cv::Point2f>& segmentNormals, std::vector<cv::Point2f>& vertexNormals);
+
+    static bool intersectRayWithPolyline(const std::vector<cv::Point2f>& polyline, const cv::Point2f& rayOrigin, const cv::Point2f& rayDir,  bool closed, cv::Point2f& outPoint, size_t& outSegmentIndex);
 
 };
 

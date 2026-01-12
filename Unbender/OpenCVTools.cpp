@@ -635,4 +635,140 @@ bool OpenCVTools::segmentIntersection(const cv::Point2f& A, const cv::Point2f& B
     return false;
 }
 
+// Segment + Vertex Normals for polyline
+// •   supports open/closed and left/right normal policies
+// Segment normals
+// •   Count = n-1 for open polylines
+// •   Count = n for closed polylines
+// •   Each normal is unit length and oriented left or right
+// Vertex normals
+// •   Endpoints (open polyline) get only one contributing segment
+// •   Interior vertices get the average of adjacent segments
+// •   Closed polylines get two contributions per vertex
+// •   All vertex normals are normalized at the end
 
+void OpenCVTools::computeNormals(const std::vector<cv::Point2f>& polyline, bool closed, bool leftNormals, std::vector<cv::Point2f>& segmentNormals, std::vector<cv::Point2f>& vertexNormals)
+{
+    segmentNormals.clear();
+    vertexNormals.clear();
+
+    const size_t n = polyline.size();
+    if (n < 2)
+        return;
+
+    const size_t segmentCount = closed ? n : (n - 1);
+
+    segmentNormals.resize(segmentCount);
+    vertexNormals.assign(n, cv::Point2f(0.0f, 0.0f));
+
+    // Embedded normalization lambda function
+    static auto normalize = [](const cv::Point2f& v) -> cv::Point2f
+    {
+        float len = std::sqrt(v.x*v.x + v.y*v.y);
+        if (len == 0.0f)
+            return cv::Point2f(0.0f, 0.0f);
+        return cv::Point2f(v.x/len, v.y/len);
+    };
+
+    // --- Compute segment normals ---
+    for (size_t i = 0; i < segmentCount; ++i)
+    {
+        size_t i0 = i;
+        size_t i1 = (i + 1);
+        if (closed)
+            i1 %= n;
+
+        cv::Point2f d = polyline[i1] - polyline[i0];
+        float len = std::sqrt(d.x*d.x + d.y*d.y);
+
+        cv::Point2f segN(0.0f, 0.0f);
+        if (len != 0.0f)
+        {
+            d.x /= len;
+            d.y /= len;
+
+            if (leftNormals)
+                segN = cv::Point2f(-d.y, d.x);   // left-hand
+            else
+                segN = cv::Point2f(d.y, -d.x);   // right-hand
+        }
+
+        segmentNormals[i] = segN;
+
+        // Accumulate into vertex normals
+        vertexNormals[i0] += segN;
+        vertexNormals[i1] += segN;
+    }
+
+    // --- Normalize vertex normals ---
+    for (size_t i = 0; i < n; ++i)
+        vertexNormals[i] = normalize(vertexNormals[i]);
+}
+
+// find the first intersection point between an OpenCV polyline and an infinite ray defined by an origin and a direction vector.
+// This version is:
+// •	Robust against degenerate segments
+// •	Deterministic and index aligned
+// •	Explicit about intersection semantics
+// •	Uses no hidden allocations
+// It returns a boolean indicating whether an intersection was found, and fills an output cv::Point2f.
+
+bool OpenCVTools::intersectRayWithPolyline(const std::vector<cv::Point2f>& polyline, const cv::Point2f& rayOrigin, const cv::Point2f& rayDir,  bool closed, cv::Point2f& outPoint, size_t& outSegmentIndex)
+{
+    outSegmentIndex = std::numeric_limits<size_t>::max();
+
+    const size_t n = polyline.size();
+    if (n < 2)
+        return false;
+
+    // Normalize ray direction
+    cv::Point2f d = rayDir;
+    float dlen = std::sqrt(d.x*d.x + d.y*d.y);
+    if (dlen == 0.0f)
+        return false;
+    d.x /= dlen;
+    d.y /= dlen;
+
+    const size_t segmentCount = closed ? n : (n - 1);
+
+    bool found = false;
+    float bestT = std::numeric_limits<float>::infinity();
+
+    for (size_t i = 0; i < segmentCount; ++i)
+    {
+        size_t i0 = i;
+        size_t i1 = (i + 1) % n;
+
+        cv::Point2f p0 = polyline[i0];
+        cv::Point2f p1 = polyline[i1];
+        cv::Point2f s = p1 - p0;  // segment direction
+
+        float det = d.x * (-s.y) - d.y * (-s.x);
+
+        // Parallel or degenerate segment
+        if (std::fabs(det) < 1e-12f)
+            continue;
+
+        // Solve:
+        // rayOrigin + t*d = p0 + u*s
+        cv::Point2f diff = p0 - rayOrigin;
+
+        float t = (diff.x * (-s.y) - diff.y * (-s.x)) / det;
+        float u = (d.x * diff.y - d.y * diff.x) / det;
+
+        // Ray: t >= 0
+        // Segment: 0 <= u <= 1
+        if (t >= 0.0f && u >= 0.0f && u <= 1.0f)
+        {
+            if (t < bestT)
+            {
+                bestT = t;
+                outPoint = rayOrigin + d * t;
+                outSegmentIndex = i;
+                found = true;
+            }
+        }
+    }
+
+    return found;
+}

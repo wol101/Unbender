@@ -61,8 +61,8 @@ target_link_libraries(Unbender PRIVATE Qt${QT_VERSION_MAJOR}::Widgets)
 
 # Link different libraries depending on build type
 target_link_libraries(Unbender PRIVATE
-    $<$<CONFIG:Debug>:"c:/dev/opencv/build/x64/vc16/lib/opencv_world4120d">
-    $<$<CONFIG:Release>:"c:/dev/opencv/build/x64/vc16/lib/opencv_world4120">
+    $<$<CONFIG:Debug>:"c:/dev/opencv/build/x64/vc16/lib/opencv_world4130d">
+    $<$<CONFIG:Release>:"c:/dev/opencv/build/x64/vc16/lib/opencv_world4130">
 )
 
 
@@ -95,9 +95,9 @@ if(QT_VERSION_MAJOR EQUAL 6)
 endif()
 
 add_custom_command(TARGET Unbender POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E copy_if_different "c:/dev/opencv/build/x64/vc16/bin/opencv_videoio_ffmpeg4120_64.dll" ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}
-    COMMAND $<$<CONFIG:Debug>:${CMAKE_COMMAND}> -E copy_if_different "c:/dev/opencv/build/x64/vc16/bin/opencv_world4120d.dll" ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}
-    COMMAND $<$<CONFIG:Release>:${CMAKE_COMMAND}> -E copy_if_different "c:/dev/opencv/build/x64/vc16/bin/opencv_world4120.dll" ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different "c:/dev/opencv/build/x64/vc16/bin/opencv_videoio_ffmpeg4130_64.dll" ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}
+    COMMAND $<$<CONFIG:Debug>:${CMAKE_COMMAND}> -E copy_if_different "c:/dev/opencv/build/x64/vc16/bin/opencv_world4130d.dll" ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}
+    COMMAND $<$<CONFIG:Release>:${CMAKE_COMMAND}> -E copy_if_different "c:/dev/opencv/build/x64/vc16/bin/opencv_world4130.dll" ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}
 )
 
 if(${CMAKE_BUILD_TYPE} STREQUAL "Release")

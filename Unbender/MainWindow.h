@@ -31,6 +31,7 @@ protected:
 private slots:
     void openImage();
     void straighten();
+    void straightenMore();
     void saveDocument();
 
 private:

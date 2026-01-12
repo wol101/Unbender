@@ -29,6 +29,7 @@ MainWindow::MainWindow(QWidget *parent)
 
     connect(m_ui->actionOpen, &QAction::triggered, this, &MainWindow::openImage);
     connect(m_ui->actionStraighten, &QAction::triggered, this, &MainWindow::straighten);
+    connect(m_ui->actionStraightenMore, &QAction::triggered, this, &MainWindow::straightenMore);
     connect(m_ui->actionQuit, &QAction::triggered, this, &MainWindow::close);
 
     setWindowTitle("Image Viewer");
@@ -174,6 +175,38 @@ void MainWindow::straighten()
     item->setPen(QPen(Qt::yellow, 2));
     item->setBrush(Qt::NoBrush);
     m_view->addItem(item);
+
+    updateUI();
+}
+
+void MainWindow::straightenMore()
+{
+    bool closed = false;
+    bool leftNormals = true;
+    std::vector<cv::Point2f> segmentNormals;
+    std::vector<cv::Point2f> vertexNormals;
+    OpenCVTools::computeNormals(m_centreLine, closed, leftNormals, segmentNormals, vertexNormals);
+
+    QGraphicsPathItem *item;
+    std::vector<cv::Point2f> stick(2);
+    for (size_t i = 1; i < vertexNormals.size() - 1; ++i)
+    {
+        cv::Point2f rayOrigin =  m_centreLine[i];
+        cv::Point2f rayDir =  vertexNormals[i];
+        bool closed = false;
+        cv::Point2f outPoint;
+        size_t outSegmentIndex;
+        bool found = OpenCVTools::intersectRayWithPolyline(m_polyA, rayOrigin, rayDir,  closed, outPoint, outSegmentIndex);
+        if (!found) continue;
+        stick[0] = outPoint;
+        found = OpenCVTools::intersectRayWithPolyline(m_polyB, rayOrigin, rayDir,  closed, outPoint, outSegmentIndex);
+        if (!found) continue;
+        stick[1] = outPoint;
+        item = new QGraphicsPathItem(OpenCVTools::convertPolylineToQPainterPath(stick, false));
+        item->setPen(QPen(Qt::darkGreen, 1));
+        item->setBrush(Qt::NoBrush);
+        m_view->addItem(item);
+    }
 
     updateUI();
 }
