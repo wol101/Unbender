@@ -1,31 +1,45 @@
 #ifndef FINDCENTRELINE_H
 #define FINDCENTRELINE_H
 
-#include "Image.h"
+#include "OpenCVTools.h"
 
 class FindCentreLine
 {
 public:
     FindCentreLine();
 
-    void findEdges();
+    void straighten();
 
-    void findTransitions(const std::vector<Image<uint8_t>::PixelAndLocation> &pixelAndLocation);
+    void straightenMore();
 
-    void setStartPoint(Point newStartPoint);
+    void setImg(const cv::Mat &newImg);
 
-    void setEndPoint(Point newEndPoint);
+    void setUserPoint1(cv::Point2f newUserPoint1);
 
-    void setImage(const Image<uint8_t> *newImage);
+    void setUserPoint2(cv::Point2f newUserPoint2);
+
+    const std::vector<cv::Point2f> &polyA() const;
+
+    const std::vector<cv::Point2f> &polyB() const;
+
+    const std::vector<cv::Point2f> &centreLine() const;
+
+    const std::vector<std::vector<cv::Point2f> > &stickList() const;
+
+    const cv::Mat &thresh() const;
 
 private:
-    const Image<uint8_t> *m_image;
-    Point m_startPoint;
-    Point m_endPoint;
-    Point m_currentPoint;
-    size_t m_radius = 20;
-    uint8_t m_threshold = 1;
+    std::vector<cv::Point2f> m_polyA;
+    std::vector<cv::Point2f> m_polyB;
+    std::vector<cv::Point2f> m_centreLine;
 
+    cv::Mat m_img;
+    cv::Mat m_thresh;
+
+    cv::Point2f m_userPoint1;
+    cv::Point2f m_userPoint2;
+
+    std::vector<std::vector<cv::Point2f> > m_stickList;
 };
 
 #endif // FINDCENTRELINE_H

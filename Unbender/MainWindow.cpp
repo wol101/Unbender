@@ -40,14 +40,14 @@ MainWindow::MainWindow(QWidget *parent)
 
     // Left side: customised GraphicsView
     QGraphicsScene* scene = new QGraphicsScene(this);
-    GraphicsView* m_view = new GraphicsView(scene);
+    m_view = new GraphicsView(scene);
 
     // Right side: your custom OpenGL widget
-    MeshViewWidget* meshView = new MeshViewWidget;
+    m_meshView = new MeshViewWidget(this);
 
     // Add widgets to splitter
     m_splitter->addWidget(m_view);
-    m_splitter->addWidget(meshView);
+    m_splitter->addWidget(m_meshView);
 
     // Optional: set initial sizes
     m_splitter->setStretchFactor(0, 1);  // graphics view grows
@@ -152,118 +152,84 @@ void MainWindow::saveDocument()
 
 void MainWindow::straighten()
 {
-    cv::Mat img = OpenCVTools::convertQImageToMat(*m_image);
-    cv::Mat thresh = OpenCVTools::thresholdImage(img, 100, true);
-    QImage thresholdImage = OpenCVTools::convertMatToQImage(thresh);
-    m_view->setImage(new QGraphicsPixmapItem(QPixmap::fromImage(thresholdImage)));
-    std::vector<cv::Point> outline = OpenCVTools::polylineFromBinaryImage(thresh);
+    m_findCentreLine.setImg(OpenCVTools::convertQImageToMat(*m_image));
 
-    std::vector<cv::Point2f> outlinef;
-    outlinef.reserve(outline.size());
-    for (const auto& p : outline) { outlinef.emplace_back(static_cast<float>(p.x), static_cast<float>(p.y)); }
     MarkerItem *p1 = m_view->position1();
-    cv::Point2f userPoint1(p1->pos().x(), p1->pos().y());
-    float vertexTolerance = 0.001;
-    std::vector<cv::Point2f> openOutline = OpenCVTools::splitClosedPolylineRobust(outlinef, userPoint1, vertexTolerance);
+    m_findCentreLine.setUserPoint1(cv::Point2f(p1->pos().x(), p1->pos().y()));
     MarkerItem *p2 = m_view->position2();
-    cv::Point2f userPoint2(p2->pos().x(), p2->pos().y());
-    OpenCVTools::splitOpenPolylineRobust(openOutline, userPoint2, vertexTolerance, m_polyA, m_polyB);
-    std::reverse(m_polyB.begin(), m_polyB.end()); // I want both polylines to start at userPoint1
+    m_findCentreLine.setUserPoint2(cv::Point2f(p2->pos().x(), p2->pos().y()));
+
+    m_findCentreLine.straighten();
 
     QGraphicsPathItem *item;
-    item = new QGraphicsPathItem(OpenCVTools::convertPolylineToQPainterPath(m_polyA, false));
+    item = new QGraphicsPathItem(OpenCVTools::convertPolylineToQPainterPath(m_findCentreLine.polyA(), false));
     item->setPen(QPen(Qt::cyan, 2));
     item->setBrush(Qt::NoBrush);
     m_view->addExtraItem(item);
-    item = new QGraphicsPathItem(OpenCVTools::convertPolylineToQPainterPath(m_polyB, false));
+    item = new QGraphicsPathItem(OpenCVTools::convertPolylineToQPainterPath(m_findCentreLine.polyB(), false));
     item->setPen(QPen(Qt::magenta, 2));
     item->setBrush(Qt::NoBrush);
     m_view->addExtraItem(item);
 
-    size_t segments = 100;
-    m_centreLine.clear();
-    std::vector<cv::Point2f> stick(2);
-    for (size_t i = 0; i < segments + 1; ++i)
+    auto stickList = m_findCentreLine.stickList();
+    for (size_t i = 0; i < stickList.size(); ++i)
     {
-        float t = float(i) / 100.0f;
-        cv::Point2f a = OpenCVTools::pointAtProportion(m_polyA, t);
-        cv::Point2f b = OpenCVTools::pointAtProportion(m_polyB, t);
-        m_centreLine.push_back(cv::Point2f(0.5f * (a.x + b.x), 0.5f * (a.y + b.y)));
-
-        stick[0] = a; stick[1] = b;
-        item = new QGraphicsPathItem(OpenCVTools::convertPolylineToQPainterPath(stick, false));
+        item = new QGraphicsPathItem(OpenCVTools::convertPolylineToQPainterPath(stickList[i], false));
         item->setPen(QPen(Qt::darkYellow, 1));
         item->setBrush(Qt::NoBrush);
         m_view->addExtraItem(item);
     }
 
-    item = new QGraphicsPathItem(OpenCVTools::convertPolylineToQPainterPath(m_centreLine, false));
+    item = new QGraphicsPathItem(OpenCVTools::convertPolylineToQPainterPath(m_findCentreLine.centreLine(), false));
     item->setPen(QPen(Qt::yellow, 2));
     item->setBrush(Qt::NoBrush);
     m_view->addExtraItem(item);
+
+    QImage thresholdImage = OpenCVTools::convertMatToQImage(m_findCentreLine.thresh());
+    m_view->setImage(new QGraphicsPixmapItem(QPixmap::fromImage(thresholdImage)));
 
     updateUI();
 }
 
 void MainWindow::straightenMore()
 {
+    m_findCentreLine.straightenMore();
+
     m_view->clearExtrasItems();
     QGraphicsPathItem *item;
-    item = new QGraphicsPathItem(OpenCVTools::convertPolylineToQPainterPath(m_polyA, false));
+    item = new QGraphicsPathItem(OpenCVTools::convertPolylineToQPainterPath(m_findCentreLine.polyA(), false));
     item->setPen(QPen(Qt::cyan, 2));
     item->setBrush(Qt::NoBrush);
     m_view->addExtraItem(item);
-    item = new QGraphicsPathItem(OpenCVTools::convertPolylineToQPainterPath(m_polyB, false));
+    item = new QGraphicsPathItem(OpenCVTools::convertPolylineToQPainterPath(m_findCentreLine.polyB(), false));
     item->setPen(QPen(Qt::magenta, 2));
     item->setBrush(Qt::NoBrush);
     m_view->addExtraItem(item);
 
-    bool closed = false;
-    bool leftNormals = true;
-    std::vector<cv::Point2f> segmentNormals;
-    std::vector<cv::Point2f> vertexNormals;
-    OpenCVTools::computeNormals(m_centreLine, closed, leftNormals, segmentNormals, vertexNormals);
-    std::vector<cv::Point2f> newCentreLine;
-    newCentreLine.reserve(m_centreLine.size());
-    newCentreLine.push_back(m_centreLine.front());
-
-    std::vector<cv::Point2f> stick(2);
-    for (size_t i = 1; i < vertexNormals.size() - 1; ++i)
+    auto stickList = m_findCentreLine.stickList();
+    for (size_t i = 0; i < stickList.size(); ++i)
     {
-        cv::Point2f rayOrigin =  m_centreLine[i];
-        cv::Point2f rayDir =  vertexNormals[i];
-        bool closed = false;
-        std::vector<OpenCVTools::RayHit> outHits;
-        float eps = std::numeric_limits<float>::epsilon();
-        OpenCVTools::intersectRayWithPolylineDeterministic(m_polyA, rayOrigin, rayDir, closed, outHits, eps);
-        if (outHits.size() == 0) continue;
-        stick[0] = outHits[0].point;
-        OpenCVTools::intersectRayWithPolylineDeterministic(m_polyB, rayOrigin, rayDir, closed, outHits, eps);
-        if (outHits.size() == 0) continue;
-        stick[1] = outHits[0].point;
-        newCentreLine.push_back(OpenCVTools::pointAtProportion(stick, 0.5));
-        item = new QGraphicsPathItem(OpenCVTools::convertPolylineToQPainterPath(stick, false));
+        item = new QGraphicsPathItem(OpenCVTools::convertPolylineToQPainterPath(stickList[i], false));
         item->setPen(QPen(Qt::darkGreen, 1));
         item->setBrush(Qt::NoBrush);
         m_view->addExtraItem(item);
     }
-    newCentreLine.push_back(m_centreLine.back());
 
-    item = new QGraphicsPathItem(OpenCVTools::convertPolylineToQPainterPath(newCentreLine, false));
+
+    item = new QGraphicsPathItem(OpenCVTools::convertPolylineToQPainterPath(m_findCentreLine.centreLine(), false));
     item->setPen(QPen(Qt::green, 1));
     item->setBrush(Qt::NoBrush);
     m_view->addExtraItem(item);
 
-    m_centreLine = newCentreLine;
-
     updateUI();
 }
+
 
 void MainWindow::updateUI()
 {
     m_ui->actionOpen->setEnabled(true);
     m_ui->actionStraighten->setEnabled(m_image != 0 && m_view->position1() && m_view->position2());
-    m_ui->actionStraightenMore->setEnabled(m_image != 0 && m_view->position1() && m_view->position2() && m_polyA.size() && m_polyB.size() && m_centreLine.size());
+    m_ui->actionStraightenMore->setEnabled(m_image != 0 && m_view->position1() && m_view->position2() && m_findCentreLine.polyA().size() && m_findCentreLine.polyB().size() && m_findCentreLine.centreLine().size());
 }
 
 void MainWindow::readSettings()

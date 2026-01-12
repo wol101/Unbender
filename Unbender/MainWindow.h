@@ -1,12 +1,13 @@
 #ifndef MAINWINDOW_H
 #define MAINWINDOW_H
 
-#include "OpenCVTools.h"
+#include "FindCentreLine.h"
 
 #include <QMainWindow>
 
-class QGraphicsScene;
 class GraphicsView;
+class MeshViewWidget;
+class QGraphicsScene;
 class QImage;
 class QSplitter;
 
@@ -39,6 +40,7 @@ private:
     Ui::MainWindow *m_ui = 0;
 
     GraphicsView *m_view = 0;
+    MeshViewWidget* m_meshView = 0;
     QString m_filePath;
     QSplitter* m_splitter = 0;
     std::unique_ptr<QImage> m_image;
@@ -47,10 +49,7 @@ private:
     void readSettings();
     void writeSettings();
 
-    std::vector<cv::Point2f> m_polyA;
-    std::vector<cv::Point2f> m_polyB;
-    std::vector<cv::Point2f> m_centreLine;
-
+    FindCentreLine m_findCentreLine;
 
 };
 #endif // MAINWINDOW_H
