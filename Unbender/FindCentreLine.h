@@ -30,6 +30,14 @@ public:
 
     const cv::Mat &thresh() const;
 
+    const std::vector<cv::Point2f> &straightCentreLine() const;
+
+    const std::vector<std::vector<cv::Point2f> > &straigthStickList() const;
+
+    const std::vector<cv::Point2f> &straightProfile() const;
+
+    const OpenCVTools::Mesh &straightMesh() const;
+
 private:
     std::vector<cv::Point2f> m_polyA;
     std::vector<cv::Point2f> m_polyB;
@@ -43,8 +51,10 @@ private:
 
     std::vector<std::vector<cv::Point2f> > m_stickList;
 
-    std::vector<cv::Point2f> m_straightLine;
+    std::vector<cv::Point2f> m_straightCentreLine;
     std::vector<std::vector<cv::Point2f> > m_straigthStickList;
+    std::vector<cv::Point2f> m_straightProfile;
+    OpenCVTools::Mesh m_straightMesh;
 };
 
 #endif // FINDCENTRELINE_H

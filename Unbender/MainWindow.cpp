@@ -19,6 +19,8 @@
 #include <QHBoxLayout>
 #include <QSplitter>
 
+#include <fstream>
+
 
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
@@ -73,7 +75,8 @@ MainWindow::~MainWindow()
 
 void MainWindow::closeEvent(QCloseEvent *event)
 {
-    if (m_unsavedChanges) {
+    if (m_unsavedChanges)
+    {
         QMessageBox::StandardButton reply;
         reply = QMessageBox::question(this, "Unsaved Changes", "You have unsaved changes. Do you want to save before quitting?", QMessageBox::Yes | QMessageBox::No | QMessageBox::Cancel);
 
@@ -86,7 +89,9 @@ void MainWindow::closeEvent(QCloseEvent *event)
         else if (reply == QMessageBox::No)
         {
             event->accept();  // quit without saving
-        } else {
+        }
+        else
+        {
             event->ignore();  // cancel close
         }
     }
@@ -220,6 +225,11 @@ void MainWindow::straightenMore()
     item->setPen(QPen(Qt::green, 1));
     item->setBrush(Qt::NoBrush);
     m_view->addExtraItem(item);
+
+    m_findCentreLine.createStraightVersion();
+    auto mesh = m_findCentreLine.straightMesh();
+    std::string objVersion = OpenCVTools::meshToOBJ(mesh, "straight_mesh");
+    std::ofstream("C:\\Scratch\\output.obj") << objVersion;
 
     updateUI();
 }

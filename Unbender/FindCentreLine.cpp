@@ -68,22 +68,40 @@ void FindCentreLine::straightenMore()
 
 void FindCentreLine::createStraightVersion()
 {
-    m_straightLine.clear();
+    m_straightCentreLine.clear();
     m_straigthStickList.clear();
-    m_straightLine.reserve(m_centreLine.size());
+    m_straightCentreLine.reserve(m_centreLine.size());
     m_straigthStickList.reserve(m_stickList.size());
-    m_straightLine.push_back({0.0f, 0.0f});
+    m_straightCentreLine.push_back({0.0f, 0.0f});
     for (size_t i = 0; i < m_centreLine.size() - 1; ++i)
     {
         float len = cv::norm(m_centreLine[i + 1] - m_centreLine[i]);
-        m_straightLine.push_back({m_straightLine[i].x + len, 0.0f});
+        m_straightCentreLine.push_back({m_straightCentreLine[i].x + len, 0.0f});
     }
-    for (size_t i = 0; i < m_stickList.size() - 1; ++i)
+    std::vector<cv::Point2f> stick(2);
+    for (size_t i = 0; i < m_stickList.size(); ++i)
     {
-        float len = cv::norm(m_centreLine[i + 1] - m_centreLine[i]);
-        m_straightLine.push_back({m_straightLine[i].x + len, 0.0f});
+        float len = cv::norm(m_stickList[i][1] - m_stickList[i][0]);
+        stick[0] = {0.0f, -len / 2.0f};
+        stick[1] = {0.0f, len / 2.0f};
+        m_straigthStickList.push_back(stick);
     }
+    m_straightProfile.clear();
+    m_straightProfile.push_back({0.0f, 0.0f});
+    for (size_t i = 0; i < m_straigthStickList.size(); ++i)
+    {
+        m_straightProfile.push_back({m_straightCentreLine[i + 1].x, m_straigthStickList[i][1].y});
+    }
+    m_straightProfile.push_back({m_straightCentreLine[m_straigthStickList.size() + 1].x, 0.0f});
+    cv::Point3f axisPoint = {0.0f, 0.0f, 0.0f};
+    cv::Point3f axisDir = {1.0f, 0.0f, 0.0f};
+    int slices = 64;
+    bool capStart = false;
+    bool capEnd = false;
+    m_straightMesh = OpenCVTools::revolvePolyline(m_straightProfile, axisPoint, axisDir, slices, capStart, capEnd);
 }
+
+
 
 void FindCentreLine::setImg(const cv::Mat &newImg)
 {
@@ -123,5 +141,25 @@ const std::vector<std::vector<cv::Point2f> > &FindCentreLine::stickList() const
 const cv::Mat &FindCentreLine::thresh() const
 {
     return m_thresh;
+}
+
+const std::vector<cv::Point2f> &FindCentreLine::straightCentreLine() const
+{
+    return m_straightCentreLine;
+}
+
+const std::vector<std::vector<cv::Point2f> > &FindCentreLine::straigthStickList() const
+{
+    return m_straigthStickList;
+}
+
+const std::vector<cv::Point2f> &FindCentreLine::straightProfile() const
+{
+    return m_straightProfile;
+}
+
+const OpenCVTools::Mesh &FindCentreLine::straightMesh() const
+{
+    return m_straightMesh;
 }
 
