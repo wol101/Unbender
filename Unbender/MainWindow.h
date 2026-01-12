@@ -8,6 +8,7 @@
 class QGraphicsScene;
 class GraphicsView;
 class QImage;
+class QSplitter;
 
 QT_BEGIN_NAMESPACE
 namespace Ui {
@@ -39,7 +40,7 @@ private:
 
     GraphicsView *m_view = 0;
     QString m_filePath;
-
+    QSplitter* m_splitter = 0;
     std::unique_ptr<QImage> m_image;
     bool m_unsavedChanges = false;
 

@@ -35,8 +35,8 @@ MainWindow::MainWindow(QWidget *parent)
     layout->setContentsMargins(0, 0, 0, 0);
 
     // Horizontal splitter
-    QSplitter* splitter = new QSplitter(Qt::Horizontal, central);
-    layout->addWidget(splitter);
+    m_splitter = new QSplitter(Qt::Horizontal, central);
+    layout->addWidget(m_splitter);
 
     // Left side: customised GraphicsView
     QGraphicsScene* scene = new QGraphicsScene(this);
@@ -46,12 +46,12 @@ MainWindow::MainWindow(QWidget *parent)
     MeshViewWidget* meshView = new MeshViewWidget;
 
     // Add widgets to splitter
-    splitter->addWidget(m_view);
-    splitter->addWidget(meshView);
+    m_splitter->addWidget(m_view);
+    m_splitter->addWidget(meshView);
 
     // Optional: set initial sizes
-    splitter->setStretchFactor(0, 1);  // graphics view grows
-    splitter->setStretchFactor(1, 1);  // mesh view grows
+    m_splitter->setStretchFactor(0, 1);  // graphics view grows
+    m_splitter->setStretchFactor(1, 1);  // mesh view grows
 
     connect(m_ui->actionOpen, &QAction::triggered, this, &MainWindow::openImage);
     connect(m_ui->actionStraighten, &QAction::triggered, this, &MainWindow::straighten);
@@ -272,12 +272,14 @@ void MainWindow::readSettings()
     m_filePath = settings.value("lastFileOpened", "").toString();
     restoreGeometry(settings.value("geometry").toByteArray());
     restoreState(settings.value("windowState").toByteArray());
+    m_splitter->restoreState(settings.value("splitterState").toByteArray());
 }
 
 void MainWindow::writeSettings()
 {
     QSettings settings(QSettings::IniFormat, QSettings::UserScope, "AnimalSimulationLaboratory", "Unbender");
     settings.setValue("lastFileOpened", m_filePath);
+    settings.setValue("splitterState", m_splitter->saveState());
     settings.setValue("geometry", saveGeometry());
     settings.setValue("windowState", saveState());
     settings.sync();
