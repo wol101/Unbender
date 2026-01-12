@@ -17,7 +17,9 @@ public:
 
     void clear();
 
-    void addItem(QGraphicsItem *item);
+    void addExtraItem(QGraphicsItem *item);
+
+    void clearExtrasItems();
 
     void setImage(QGraphicsPixmapItem *pixmapItem);
 
@@ -42,6 +44,11 @@ private:
     MarkerItem *m_position2 = 0;
     QGraphicsPixmapItem *m_image = 0;
     QGraphicsPathItem *m_outline = 0;
+    std::vector<QGraphicsItem *> m_extraItems;
+
+    bool panning = false;
+    QPoint panStart;
+
 };
 
 #endif // GRAPHICSVIEW_H

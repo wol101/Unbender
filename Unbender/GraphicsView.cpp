@@ -6,62 +6,88 @@
 #include <QGraphicsItem>
 #include <QStatusBar>
 #include <QMainWindow>
+#include <QScrollBar>
 
 GraphicsView::GraphicsView(QGraphicsScene *scene, QWidget *parent) : QGraphicsView(scene, parent)
 {
     // setDragMode(QGraphicsView::ScrollHandDrag);
-    // setTransformationAnchor(QGraphicsView::AnchorUnderMouse);
+    setTransformationAnchor(QGraphicsView::AnchorUnderMouse);
+    setResizeAnchor(QGraphicsView::AnchorViewCenter);
+    // Optional: smoother visual quality
+    setRenderHints(QPainter::Antialiasing | QPainter::SmoothPixmapTransform | QPainter::TextAntialiasing);
     setMouseTracking(true); // needed to get mouse move events all the time
 }
 
 void GraphicsView::wheelEvent(QWheelEvent *event)
 {
-    // Zoom factor
-    const double zoomInFactor = 1.15;
-    const double zoomOutFactor = 1.0 / zoomInFactor;
+    constexpr double zoomInFactor  = 1.15;
+    constexpr double zoomOutFactor = 1.0 / zoomInFactor;
 
-    // Save the scene position under the mouse
-    QPointF beforeScale = mapToScene(event->position().toPoint());
-
-    // Choose zoom direction
     double factor = (event->angleDelta().y() > 0) ? zoomInFactor : zoomOutFactor;
+
+    // Optional: clamp total zoom
+    const double currentScale = transform().m11(); // assumes uniform scaling
+    const double minScale = 0.05;
+    const double maxScale = 50.0;
+
+    double newScale = currentScale * factor;
+    if (newScale < minScale)
+        factor = minScale / currentScale;
+    else if (newScale > maxScale)
+        factor = maxScale / currentScale;
+
     scale(factor, factor);
 
-    // After scaling, map the mouse position again
-    QPointF afterScale = mapToScene(event->position().toPoint());
-
-    // Adjust the view so the mouse stays over the same scene point
-    QPointF offset = afterScale - beforeScale;
-    translate(offset.x(), offset.y());
 }
 
 void GraphicsView::mousePressEvent(QMouseEvent *event)
 {
-    if (event->button() == Qt::LeftButton)
+    if (event->button() == Qt::LeftButton && m_image)
     {
-        if (m_image)
+        QPointF centre = mapToScene(event->pos());
+        if (!m_cursor)
         {
-            QPointF centre = mapToScene(event->pos());
-            if (!m_cursor)
-            {
-                MarkerItem::MarkerShape shape = MarkerItem::Cross;
-                qreal size = 10.0;
-                QColor colour = Qt::red;
-                m_cursor = new MarkerItem(centre, shape, size, colour);
-                scene()->addItem(m_cursor);
-            }
-            else
-            {
-                m_cursor->setPos(centre);
-            }
-            if (QMainWindow* mainWindow = qobject_cast<QMainWindow*>(this->window())) { mainWindow->statusBar()->showMessage(QString("Cursor x = %1 y = %2").arg(m_cursor->pos().x()).arg(m_cursor->pos().y()), 10000); }
-            if (MainWindow* mainWindow = qobject_cast<MainWindow*>(this->window())) { mainWindow->updateUI(); }
+            MarkerItem::MarkerShape shape = MarkerItem::Cross;
+            qreal size = 10.0;
+            QColor colour = Qt::red;
+            m_cursor = new MarkerItem(centre, shape, size, colour);
+            scene()->addItem(m_cursor);
         }
-   }
+        else
+        {
+            m_cursor->setPos(centre);
+        }
+        if (QMainWindow* mainWindow = qobject_cast<QMainWindow*>(this->window())) { mainWindow->statusBar()->showMessage(QString("Cursor x = %1 y = %2").arg(m_cursor->pos().x()).arg(m_cursor->pos().y()), 10000); }
+        if (MainWindow* mainWindow = qobject_cast<MainWindow*>(this->window())) { mainWindow->updateUI(); }
+        event->accept();
+        return;
+    }
+    if (event->button() == Qt::MiddleButton  && m_image)
+    {
+        panning = true;
+        panStart = event->pos();
+        setCursor(Qt::ClosedHandCursor);
+        event->accept();
+        return;
+    }
+
+    QGraphicsView::mousePressEvent(event);
 }
 
 void GraphicsView::mouseMoveEvent(QMouseEvent *event)
 {
+    if (panning && m_image)
+    {
+        QPoint delta = event->pos() - panStart;
+        panStart = event->pos();
+
+        horizontalScrollBar()->setValue(horizontalScrollBar()->value() - delta.x());
+        verticalScrollBar()->setValue(verticalScrollBar()->value() - delta.y());
+
+        event->accept();
+        return;
+    }
+
     if (m_image)
     {
         // Map mouse position from view → scene → item
@@ -77,16 +103,25 @@ void GraphicsView::mouseMoveEvent(QMouseEvent *event)
             // Convert pixmap to QImage and query pixel
             QImage img = m_image->pixmap().toImage();
             QColor color = img.pixelColor(x, y);
-            if (QMainWindow* mainWindow = qobject_cast<QMainWindow*>(this->window())) { mainWindow->statusBar()->showMessage(QString("R = %1 G = %2 B = %3 A = %4").arg(color.red()).arg(color.green()).arg(color.blue()).arg(color.alpha())); }
+            if (QMainWindow* mainWindow = qobject_cast<QMainWindow*>(this->window())) { mainWindow->statusBar()->showMessage(QString("x=%1 y=%2 R=%3 G=%4 B=%5 A=%6").arg(x).arg(y).arg(color.red()).arg(color.green()).arg(color.blue()).arg(color.alpha())); }
         }
     }
+
+    QGraphicsView::mouseMoveEvent(event);
+
 }
 
 void GraphicsView::mouseReleaseEvent(QMouseEvent *event)
 {
-    if (event->button() == Qt::LeftButton)
+    if (event->button() == Qt::MiddleButton)
     {
+        panning = false;
+        setCursor(Qt::ArrowCursor);
+        event->accept();
+        return;
     }
+    QGraphicsView::mouseReleaseEvent(event);
+
 }
 
 void GraphicsView::keyPressEvent(QKeyEvent* event)
@@ -139,6 +174,7 @@ void GraphicsView::keyPressEvent(QKeyEvent* event)
 void GraphicsView::clear()
 {
     scene()->clear();
+    m_extraItems.clear();
     m_cursor = 0;
     m_position1 = 0;
     m_position2 = 0;
@@ -146,25 +182,50 @@ void GraphicsView::clear()
     m_outline = 0;
 }
 
-void GraphicsView::addItem(QGraphicsItem *item)
+void GraphicsView::addExtraItem(QGraphicsItem *item)
 {
-    scene()->addItem(item);
+    if (item)
+    {
+        m_extraItems.push_back(item);
+        scene()->addItem(item);
+    }
+}
+
+void GraphicsView::clearExtrasItems()
+{
+    for (auto &&item : m_extraItems)
+    {
+        scene()->removeItem(item);
+        delete item;
+    }
+    m_extraItems.clear();
 }
 
 void GraphicsView::setImage(QGraphicsPixmapItem *pixmapItem)
 {
-    if (m_image) scene()->removeItem(m_image);
+    if (m_image)
+    {
+        scene()->removeItem(m_image);
+        delete m_image;
+    }
     m_image = pixmapItem;
-    scene()->addItem(m_image);
+    if (m_image) { scene()->addItem(m_image); }
 }
 
 void GraphicsView::setOutline(QGraphicsPathItem *pathItem)
 {
-    if (m_outline) scene()->removeItem(m_outline);
+    if (m_outline)
+    {
+        scene()->removeItem(m_outline);
+        delete m_outline;
+    }
     m_outline = pathItem;
-    m_outline->setPen(QPen(Qt::magenta, 2));
-    m_outline->setBrush(Qt::NoBrush);
-    scene()->addItem(m_outline);
+    if (m_outline)
+    {
+        m_outline->setPen(QPen(Qt::magenta, 2));
+        m_outline->setBrush(Qt::NoBrush);
+        scene()->addItem(m_outline);
+    }
 }
 
 MarkerItem *GraphicsView::position2() const

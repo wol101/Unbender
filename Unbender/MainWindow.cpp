@@ -148,11 +148,11 @@ void MainWindow::straighten()
     item = new QGraphicsPathItem(OpenCVTools::convertPolylineToQPainterPath(m_polyA, false));
     item->setPen(QPen(Qt::cyan, 2));
     item->setBrush(Qt::NoBrush);
-    m_view->addItem(item);
+    m_view->addExtraItem(item);
     item = new QGraphicsPathItem(OpenCVTools::convertPolylineToQPainterPath(m_polyB, false));
     item->setPen(QPen(Qt::magenta, 2));
     item->setBrush(Qt::NoBrush);
-    m_view->addItem(item);
+    m_view->addExtraItem(item);
 
     size_t segments = 100;
     m_centreLine.clear();
@@ -168,19 +168,30 @@ void MainWindow::straighten()
         item = new QGraphicsPathItem(OpenCVTools::convertPolylineToQPainterPath(stick, false));
         item->setPen(QPen(Qt::darkYellow, 1));
         item->setBrush(Qt::NoBrush);
-        m_view->addItem(item);
+        m_view->addExtraItem(item);
     }
 
     item = new QGraphicsPathItem(OpenCVTools::convertPolylineToQPainterPath(m_centreLine, false));
     item->setPen(QPen(Qt::yellow, 2));
     item->setBrush(Qt::NoBrush);
-    m_view->addItem(item);
+    m_view->addExtraItem(item);
 
     updateUI();
 }
 
 void MainWindow::straightenMore()
 {
+    m_view->clearExtrasItems();
+    QGraphicsPathItem *item;
+    item = new QGraphicsPathItem(OpenCVTools::convertPolylineToQPainterPath(m_polyA, false));
+    item->setPen(QPen(Qt::cyan, 2));
+    item->setBrush(Qt::NoBrush);
+    m_view->addExtraItem(item);
+    item = new QGraphicsPathItem(OpenCVTools::convertPolylineToQPainterPath(m_polyB, false));
+    item->setPen(QPen(Qt::magenta, 2));
+    item->setBrush(Qt::NoBrush);
+    m_view->addExtraItem(item);
+
     bool closed = false;
     bool leftNormals = true;
     std::vector<cv::Point2f> segmentNormals;
@@ -188,8 +199,8 @@ void MainWindow::straightenMore()
     OpenCVTools::computeNormals(m_centreLine, closed, leftNormals, segmentNormals, vertexNormals);
     std::vector<cv::Point2f> newCentreLine;
     newCentreLine.reserve(m_centreLine.size());
+    newCentreLine.push_back(m_centreLine.front());
 
-    QGraphicsPathItem *item;
     std::vector<cv::Point2f> stick(2);
     for (size_t i = 1; i < vertexNormals.size() - 1; ++i)
     {
@@ -206,15 +217,16 @@ void MainWindow::straightenMore()
         stick[1] = outHits[0].point;
         newCentreLine.push_back(OpenCVTools::pointAtProportion(stick, 0.5));
         item = new QGraphicsPathItem(OpenCVTools::convertPolylineToQPainterPath(stick, false));
-        item->setPen(QPen(Qt::green, 1));
+        item->setPen(QPen(Qt::darkGreen, 1));
         item->setBrush(Qt::NoBrush);
-        m_view->addItem(item);
+        m_view->addExtraItem(item);
     }
+    newCentreLine.push_back(m_centreLine.back());
 
     item = new QGraphicsPathItem(OpenCVTools::convertPolylineToQPainterPath(newCentreLine, false));
     item->setPen(QPen(Qt::green, 1));
     item->setBrush(Qt::NoBrush);
-    m_view->addItem(item);
+    m_view->addExtraItem(item);
 
     m_centreLine = newCentreLine;
 
