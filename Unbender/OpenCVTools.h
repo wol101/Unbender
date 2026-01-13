@@ -77,6 +77,9 @@ public:
 
     static std::string meshToOBJ(const OpenCVTools::Mesh& mesh, const std::string& objectName = "mesh");
 
+    static bool subtractBackground(const std::string& inputPath, const std::string& outputPath);
+
+
 };
 
 #endif // OPENCVTOOLS_H

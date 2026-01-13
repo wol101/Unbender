@@ -66,6 +66,8 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent) , m_ui(new Ui::Mai
     straightenAction->setObjectName("straightenAction");
     auto *straightenMoreAction = new QAction(tr("Straighten More"), this);
     straightenMoreAction->setObjectName("straightenMoreAction");
+    auto *backgroundSubtractVideo = new QAction(tr("Background Subtract Video..."), this);
+    backgroundSubtractVideo->setObjectName("backgroundSubtractVideo");
 
     // Create toolbar
     auto *toolbar = addToolBar(tr("Main Toolbar"));
@@ -87,11 +89,15 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent) , m_ui(new Ui::Mai
     QMenu *actionMenu = menuBar()->addMenu(tr("&Action"));
     actionMenu->addAction(straightenAction);
     actionMenu->addAction(straightenMoreAction);
+    actionMenu->addSeparator();
+    actionMenu->addAction(backgroundSubtractVideo);
 
     connect(openAction, &QAction::triggered, this, &MainWindow::openImage);
+    connect(saveAction, &QAction::triggered, this, &MainWindow::saveDocument);
+    connect(quitAction, &QAction::triggered, this, &MainWindow::close);
     connect(straightenAction, &QAction::triggered, this, &MainWindow::straighten);
     connect(straightenMoreAction, &QAction::triggered, this, &MainWindow::straightenMore);
-    connect(quitAction, &QAction::triggered, this, &MainWindow::close);
+    connect(backgroundSubtractVideo, &QAction::triggered, this, &MainWindow::backgroundSubtractVideo);
 
     setWindowTitle("Image Viewer");
 
@@ -136,7 +142,7 @@ void MainWindow::closeEvent(QCloseEvent *event)
 
 void MainWindow::openImage()
 {
-    QString fileName = QFileDialog::getOpenFileName(this, "Open Image", m_filePath, "Images (*.png *.jpg *.jpeg *.bmp *.gif)");
+    QString fileName = QFileDialog::getOpenFileName(this, "Open Image", m_filePath, "Images (*.png *.jpg *.jpeg *.bmp *.gif);;Any File (*.* *)");
 
     if (!fileName.isEmpty())
     {
@@ -147,9 +153,6 @@ void MainWindow::openImage()
 
         if (!image.isNull())
         {
-            // cv::Mat mat = OpenCVTools::convertQImageToMat(image);
-            // QImage newImage = OpenCVTools::convertMatToQImage(mat);
-            // QGraphicsPixmapItem *item = new QGraphicsPixmapItem(QPixmap::fromImage(newImage));
             QGraphicsPixmapItem *item = new QGraphicsPixmapItem(QPixmap::fromImage(image));
             m_view->clear();
             m_view->setImage(item);
@@ -275,6 +278,8 @@ void MainWindow::updateUI()
     findChild<QAction*>("saveAction")->setEnabled(false);
     findChild<QAction*>("straightenAction")->setEnabled(m_image != 0 && m_view->position1() && m_view->position2());
     findChild<QAction*>("straightenMoreAction")->setEnabled(m_image != 0 && m_view->position1() && m_view->position2() && m_findCentreLine.polyA().size() && m_findCentreLine.polyB().size() && m_findCentreLine.centreLine().size());
+    findChild<QAction*>("backgroundSubtractVideo")->setEnabled(true);
+
 }
 
 void MainWindow::readSettings()
@@ -296,3 +301,15 @@ void MainWindow::writeSettings()
     settings.sync();
 }
 
+void MainWindow::backgroundSubtractVideo()
+{
+    QString fileName = QFileDialog::getOpenFileName(this, "Open Movie", m_filePath, "Movies (*.mp4 *.avi *.mov);;Any File (*.* *)");
+
+    if (!fileName.isEmpty())
+    {
+        std::filesystem::path inputPath = fileName.toStdString();
+        std::filesystem::path outputPath = inputPath;
+        outputPath.replace_filename(inputPath.stem().string() + "_no_bg.mp4");
+        OpenCVTools::subtractBackground(inputPath.string(), outputPath.string());
+    }
+}

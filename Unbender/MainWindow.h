@@ -32,9 +32,10 @@ protected:
 
 private slots:
     void openImage();
+    void saveDocument();
     void straighten();
     void straightenMore();
-    void saveDocument();
+    void backgroundSubtractVideo();
 
 private:
     Ui::MainWindow *m_ui = 0;

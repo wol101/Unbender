@@ -1057,3 +1057,138 @@ std::string OpenCVTools::meshToOBJ(const OpenCVTools::Mesh& mesh, const std::str
     return out.str();
 }
 
+bool OpenCVTools::subtractBackground(const std::string& inputPath, const std::string& outputPath)
+{
+    cv::VideoCapture cap(inputPath);
+    if (!cap.isOpened()) {
+        std::cerr << "Error: Cannot open input video: " << inputPath << std::endl;
+        return false;
+    }
+
+    int width  = static_cast<int>(cap.get(cv::CAP_PROP_FRAME_WIDTH));
+    int height = static_cast<int>(cap.get(cv::CAP_PROP_FRAME_HEIGHT));
+    double fps = cap.get(cv::CAP_PROP_FPS);
+
+    cv::VideoWriter writer(
+        outputPath,
+        cv::VideoWriter::fourcc('M','J','P','G'),
+        // cv::VideoWriter::fourcc('a','v','c','1'), // H.264 if available
+        fps,
+        cv::Size(width, height),
+        false // output is grayscale mask
+        );
+
+    if (!writer.isOpened()) {
+        std::cerr << "Error: Cannot open output video: " << outputPath << std::endl;
+        return false;
+    }
+
+    // Create background subtractor (MOG2 is robust and widely supported)
+    cv::Ptr<cv::BackgroundSubtractor> bg =
+        cv::createBackgroundSubtractorMOG2(/*history=*/500,
+                                           /*varThreshold=*/16,
+                                           /*detectShadows=*/false);
+
+    cv::Mat frame, fgMask;
+
+    while (true) {
+        if (!cap.read(frame) || frame.empty())
+            break;
+
+        // Apply background subtraction
+        bg->apply(frame, fgMask);
+
+        // Write mask to output
+        writer.write(fgMask);
+    }
+
+    return true;
+}
+
+#include <opencv2/opencv.hpp>
+#include <filesystem>
+#include <iostream>
+#include <vector>
+
+namespace fs = std::filesystem;
+
+struct CodecAttempt {
+    std::string name;
+    int fourcc;
+    std::string containerHint; // e.g. ".mp4", ".avi"
+};
+
+struct WriterResult {
+    bool ok = false;
+    std::string message;
+    std::string codecUsed;
+};
+
+WriterResult openWithFallback(cv::VideoWriter& writer,
+                              fs::path outputPath,
+                              double fps,
+                              cv::Size size,
+                              bool isColor)
+{
+    // Ordered fallback list
+    std::vector<CodecAttempt> codecs = {
+        {"H.264 (avc1)", cv::VideoWriter::fourcc('a','v','c','1'), ".mp4"},
+        {"H.264 (H264)", cv::VideoWriter::fourcc('H','2','6','4'), ".mp4"},
+        {"XVID",         cv::VideoWriter::fourcc('X','V','I','D'), ".avi"},
+        {"MJPEG",        cv::VideoWriter::fourcc('M','J','P','G'), ".avi"},
+        {"FFV1",         cv::VideoWriter::fourcc('F','F','V','1'), ".mkv"},
+        {"HuffYUV",      cv::VideoWriter::fourcc('H','F','Y','U'), ".avi"}
+    };
+
+    WriterResult result;
+
+    // Validate directory
+    fs::path parent = outputPath.parent_path();
+    if (!parent.empty() && !fs::exists(parent)) {
+        result.message = "Output directory does not exist: " + parent.string();
+        return result;
+    }
+
+    // Try each codec in order
+    for (const auto& c : codecs) {
+        fs::path attemptPath = outputPath;
+        attemptPath.replace_extension(c.containerHint);
+
+        std::cout << "Trying codec: " << c.name
+                  << " → " << attemptPath << std::endl;
+
+#ifdef _WIN32
+        bool opened = writer.open(attemptPath.wstring(),
+                                  c.fourcc, fps, size, isColor);
+#else
+        bool opened = writer.open(attemptPath.string(),
+                                  c.fourcc, fps, size, isColor);
+#endif
+
+        if (!opened) {
+            std::cout << "  Failed to open writer for " << c.name << std::endl;
+            continue;
+        }
+
+        // Try writing a dummy frame
+        cv::Mat dummy(size, isColor ? CV_8UC3 : CV_8UC1, cv::Scalar(0));
+        try {
+            writer.write(dummy);
+        } catch (...) {
+            std::cout << "  Codec " << c.name
+                      << " opened but failed to encode a test frame" << std::endl;
+            continue;
+        }
+
+        // Success
+        result.ok = true;
+        result.codecUsed = c.name;
+        result.message = "Successfully opened writer using codec: " + c.name +
+                         " → " + attemptPath.string();
+        return result;
+    }
+
+    result.message = "All codec attempts failed. Check OpenCV build info and backend support.";
+    return result;
+}
+
