@@ -18,13 +18,13 @@
 #include <QMessageBox>
 #include <QHBoxLayout>
 #include <QSplitter>
+#include <QStyle>
+#include <QToolBar>
 
 #include <fstream>
 
 
-MainWindow::MainWindow(QWidget *parent)
-    : QMainWindow(parent)
-    , m_ui(new Ui::MainWindow)
+MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent) , m_ui(new Ui::MainWindow)
 {
     m_ui->setupUi(this);
 
@@ -51,14 +51,46 @@ MainWindow::MainWindow(QWidget *parent)
     m_splitter->addWidget(m_view);
     m_splitter->addWidget(m_meshView);
 
-    // Optional: set initial sizes
-    m_splitter->setStretchFactor(0, 1);  // graphics view grows
-    m_splitter->setStretchFactor(1, 1);  // mesh view grows
+    // Force even split
+    m_splitter->setSizes({1, 1});
 
-    connect(m_ui->actionOpen, &QAction::triggered, this, &MainWindow::openImage);
-    connect(m_ui->actionStraighten, &QAction::triggered, this, &MainWindow::straighten);
-    connect(m_ui->actionStraightenMore, &QAction::triggered, this, &MainWindow::straightenMore);
-    connect(m_ui->actionQuit, &QAction::triggered, this, &MainWindow::close);
+    // Create actions
+    auto *openAction = new QAction(style()->standardIcon(QStyle::SP_DialogOpenButton), tr("Open"), this);
+    openAction->setObjectName("openAction");
+    auto *saveAction = new QAction(style()->standardIcon(QStyle::SP_DialogSaveButton), tr("Save"), this);
+    saveAction->setObjectName("saveAction");
+    auto *quitAction = new QAction(style()->standardIcon(QStyle::SP_DialogCloseButton), tr("Quit"), this);
+    quitAction->setObjectName("quitAction");
+
+    auto *straightenAction = new QAction(tr("Straighten"), this);
+    straightenAction->setObjectName("straightenAction");
+    auto *straightenMoreAction = new QAction(tr("Straighten More"), this);
+    straightenMoreAction->setObjectName("straightenMoreAction");
+
+    // Create toolbar
+    auto *toolbar = addToolBar(tr("Main Toolbar"));
+    toolbar->setObjectName("mainToolbar");  // useful for saving/restoring state
+
+    // Add actions
+    toolbar->addAction(openAction);
+    toolbar->addAction(saveAction);
+    toolbar->addAction(quitAction);
+
+    // Create menus
+    QMenu *fileMenu = menuBar()->addMenu(tr("&File"));
+    fileMenu->addAction(openAction);
+    fileMenu->addAction(saveAction);
+    fileMenu->addSeparator();
+    fileMenu->addAction(quitAction);
+
+    QMenu *actionMenu = menuBar()->addMenu(tr("&Action"));
+    actionMenu->addAction(straightenAction);
+    actionMenu->addAction(straightenMoreAction);
+
+    connect(openAction, &QAction::triggered, this, &MainWindow::openImage);
+    connect(straightenAction, &QAction::triggered, this, &MainWindow::straighten);
+    connect(straightenMoreAction, &QAction::triggered, this, &MainWindow::straightenMore);
+    connect(quitAction, &QAction::triggered, this, &MainWindow::close);
 
     setWindowTitle("Image Viewer");
 
@@ -237,9 +269,11 @@ void MainWindow::straightenMore()
 
 void MainWindow::updateUI()
 {
-    m_ui->actionOpen->setEnabled(true);
-    m_ui->actionStraighten->setEnabled(m_image != 0 && m_view->position1() && m_view->position2());
-    m_ui->actionStraightenMore->setEnabled(m_image != 0 && m_view->position1() && m_view->position2() && m_findCentreLine.polyA().size() && m_findCentreLine.polyB().size() && m_findCentreLine.centreLine().size());
+    findChild<QAction*>("openAction")->setEnabled(true);
+    findChild<QAction*>("quitAction")->setEnabled(true);
+    findChild<QAction*>("saveAction")->setEnabled(false);
+    findChild<QAction*>("straightenAction")->setEnabled(m_image != 0 && m_view->position1() && m_view->position2());
+    findChild<QAction*>("straightenMoreAction")->setEnabled(m_image != 0 && m_view->position1() && m_view->position2() && m_findCentreLine.polyA().size() && m_findCentreLine.polyB().size() && m_findCentreLine.centreLine().size());
 }
 
 void MainWindow::readSettings()
