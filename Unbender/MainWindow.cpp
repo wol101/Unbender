@@ -74,6 +74,7 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent) , m_ui(new Ui::Mai
     // Add actions
     toolbar->addAction(openAction);
     toolbar->addAction(saveAction);
+    toolbar->addSeparator();
     toolbar->addAction(quitAction);
 
     // Create menus
