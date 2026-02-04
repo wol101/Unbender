@@ -303,7 +303,7 @@ void MainWindow::writeSettings()
 
 void MainWindow::backgroundSubtractVideo()
 {
-    QString fileName = QFileDialog::getOpenFileName(this, "Open Movie", m_filePath, "Movies (*.mp4 *.avi *.mov);;Any File (*.* *)");
+    QString fileName = QFileDialog::getOpenFileName(this, "Open Movie", m_filePath, "Movies (*.avi *.mkv *.mov *.mp4);;Any File (*.* *)");
 
     if (!fileName.isEmpty())
     {

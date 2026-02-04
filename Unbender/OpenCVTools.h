@@ -7,7 +7,6 @@
 
 #include <string>
 
-
 class OpenCVTools
 {
 public:
@@ -27,6 +26,18 @@ public:
         std::vector<cv::Point3f> normals;
         std::vector<cv::Point2f> uvs;
         std::vector<cv::Vec3i>   triangles;
+    };
+
+    struct CodecAttempt {
+        std::string name;
+        int fourcc;
+        std::string containerHint; // e.g. ".mp4", ".avi"
+    };
+
+    struct WriterResult {
+        bool ok = false;
+        std::string message;
+        std::string codecUsed;
     };
 
     static cv::Mat convertQImageToMat(const QImage &img);
@@ -79,6 +90,7 @@ public:
 
     static bool subtractBackground(const std::string& inputPath, const std::string& outputPath);
 
+    static OpenCVTools::WriterResult openWithFallback(cv::VideoWriter& writer, std::string outputPath, double fps, cv::Size size, bool isColor);
 
 };
 

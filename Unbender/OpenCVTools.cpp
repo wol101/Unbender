@@ -5,6 +5,7 @@
 #include <QDebug>
 
 #include <sstream>
+#include <filesystem>
 
 OpenCVTools::OpenCVTools() {}
 
@@ -1069,14 +1070,12 @@ bool OpenCVTools::subtractBackground(const std::string& inputPath, const std::st
     int height = static_cast<int>(cap.get(cv::CAP_PROP_FRAME_HEIGHT));
     double fps = cap.get(cv::CAP_PROP_FPS);
 
-    cv::VideoWriter writer(
-        outputPath,
-        cv::VideoWriter::fourcc('M','J','P','G'),
-        // cv::VideoWriter::fourcc('a','v','c','1'), // H.264 if available
-        fps,
-        cv::Size(width, height),
-        false // output is grayscale mask
-        );
+    cv::Size size(width, height);
+    bool isColor = false;
+    // cv::VideoWriter writer;
+    // OpenCVTools::WriterResult result = openWithFallback(writer, outputPath, fps, size, isColor);
+
+    cv::VideoWriter writer(outputPath, cv::VideoWriter::fourcc('X','V','I','D'), fps, size, isColor);
 
     if (!writer.isOpened()) {
         std::cerr << "Error: Cannot open output video: " << outputPath << std::endl;
@@ -1105,30 +1104,7 @@ bool OpenCVTools::subtractBackground(const std::string& inputPath, const std::st
     return true;
 }
 
-#include <opencv2/opencv.hpp>
-#include <filesystem>
-#include <iostream>
-#include <vector>
-
-namespace fs = std::filesystem;
-
-struct CodecAttempt {
-    std::string name;
-    int fourcc;
-    std::string containerHint; // e.g. ".mp4", ".avi"
-};
-
-struct WriterResult {
-    bool ok = false;
-    std::string message;
-    std::string codecUsed;
-};
-
-WriterResult openWithFallback(cv::VideoWriter& writer,
-                              fs::path outputPath,
-                              double fps,
-                              cv::Size size,
-                              bool isColor)
+OpenCVTools::WriterResult OpenCVTools::openWithFallback(cv::VideoWriter& writer, std::string outputPath, double fps, cv::Size size, bool isColor)
 {
     // Ordered fallback list
     std::vector<CodecAttempt> codecs = {
@@ -1143,27 +1119,21 @@ WriterResult openWithFallback(cv::VideoWriter& writer,
     WriterResult result;
 
     // Validate directory
-    fs::path parent = outputPath.parent_path();
-    if (!parent.empty() && !fs::exists(parent)) {
+    std::filesystem::path parent = std::filesystem::path(outputPath).parent_path();
+    if (!parent.empty() && !std::filesystem::exists(parent)) {
         result.message = "Output directory does not exist: " + parent.string();
         return result;
     }
 
     // Try each codec in order
     for (const auto& c : codecs) {
-        fs::path attemptPath = outputPath;
+        std::filesystem::path attemptPath = outputPath;
         attemptPath.replace_extension(c.containerHint);
 
         std::cout << "Trying codec: " << c.name
                   << " → " << attemptPath << std::endl;
 
-#ifdef _WIN32
-        bool opened = writer.open(attemptPath.wstring(),
-                                  c.fourcc, fps, size, isColor);
-#else
-        bool opened = writer.open(attemptPath.string(),
-                                  c.fourcc, fps, size, isColor);
-#endif
+        bool opened = writer.open(attemptPath.string(), c.fourcc, fps, size, isColor);
 
         if (!opened) {
             std::cout << "  Failed to open writer for " << c.name << std::endl;
