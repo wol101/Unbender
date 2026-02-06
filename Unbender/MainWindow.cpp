@@ -5,6 +5,7 @@
 #include "MeshViewWidget.h"
 #include "OpenCVTools.h"
 #include "MarkerItem.h"
+#include "DualDirectoryDialog.h"
 
 #include <QGraphicsView>
 #include <QGraphicsScene>
@@ -142,6 +143,12 @@ void MainWindow::closeEvent(QCloseEvent *event)
 
 void MainWindow::openImage()
 {
+    DualDirectoryDialog *dialog = new DualDirectoryDialog(this);
+    int status = dialog->exec();
+    if (status == QDialog::Accepted)
+    {
+    }
+    /*
     QString fileName = QFileDialog::getOpenFileName(this, "Open Image", m_filePath, "Images (*.png *.jpg *.jpeg *.bmp *.gif);;Any File (*.* *)");
 
     if (!fileName.isEmpty())
@@ -183,6 +190,7 @@ void MainWindow::openImage()
             }
         }
     }
+    */
     updateUI();
 }
 
