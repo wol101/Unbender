@@ -5,7 +5,7 @@ FindCentreLine::FindCentreLine() {}
 void FindCentreLine::straighten()
 {
     m_stickList.clear();
-    m_thresh = OpenCVTools::thresholdImage(m_img, 100, true);
+    m_thresh = OpenCVTools::thresholdImage(m_img, m_thresholdValue, m_invertTheshold);
     std::vector<cv::Point> outline = OpenCVTools::polylineFromBinaryImage(m_thresh);
 
     std::vector<cv::Point2f> outlinef;
@@ -161,5 +161,15 @@ const std::vector<cv::Point2f> &FindCentreLine::straightProfile() const
 const OpenCVTools::Mesh &FindCentreLine::straightMesh() const
 {
     return m_straightMesh;
+}
+
+void FindCentreLine::setThresholdValue(int newThresholdValue)
+{
+    m_thresholdValue = newThresholdValue;
+}
+
+bool FindCentreLine::invertTheshold() const
+{
+    return m_invertTheshold;
 }
 

@@ -38,6 +38,10 @@ public:
 
     const OpenCVTools::Mesh &straightMesh() const;
 
+    void setThresholdValue(int newThresholdValue);
+
+    bool invertTheshold() const;
+
 private:
     std::vector<cv::Point2f> m_polyA;
     std::vector<cv::Point2f> m_polyB;
@@ -45,6 +49,8 @@ private:
 
     cv::Mat m_img;
     cv::Mat m_thresh;
+    int m_thresholdValue = 127;
+    bool m_invertTheshold = false;
 
     cv::Point2f m_userPoint1;
     cv::Point2f m_userPoint2;

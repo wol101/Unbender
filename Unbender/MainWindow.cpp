@@ -22,6 +22,7 @@
 #include <QToolBar>
 #include <QLineEdit>
 #include <QWidgetAction>
+#include <QSpinBox>
 
 #include <fstream>
 
@@ -57,78 +58,87 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent) , m_ui(new Ui::Mai
     m_splitter->setSizes({1, 1});
 
     // Create actions
-    auto *openAction = new QAction(style()->standardIcon(QStyle::SP_DialogOpenButton), tr("Open"), this);
-    openAction->setObjectName("openAction");
-    auto *saveAction = new QAction(style()->standardIcon(QStyle::SP_DialogSaveButton), tr("Save"), this);
-    saveAction->setObjectName("saveAction");
-    auto *quitAction = new QAction(style()->standardIcon(QStyle::SP_DialogCloseButton), tr("Quit"), this);
-    quitAction->setObjectName("quitAction");
+    // auto *saveAction = new QAction(style()->standardIcon(QStyle::SP_DialogSaveButton), tr("Save"), this);
+    auto *quitAction = new QAction(style()->standardIcon(QStyle::SP_TitleBarCloseButton), tr("Quit"), this);
 
-    auto *inputFolderAction = new QAction(style()->standardIcon(QStyle::SP_DialogOpenButton), tr("Input Folder..."), this);
-    inputFolderAction->setObjectName("openAction");
-    auto *outputFolderAction = new QAction(style()->standardIcon(QStyle::SP_DialogOpenButton), tr("Output Folder..."), this);
-    outputFolderAction->setObjectName("openAction");
+    m_inputFolderAction = new QAction(style()->standardIcon(QStyle::SP_DialogOpenButton), tr("Input Folder..."), this);
+    m_outputFolderAction = new QAction(style()->standardIcon(QStyle::SP_DialogOpenButton), tr("Output Folder..."), this);
 
-    auto *straightenAction = new QAction(tr("Straighten"), this);
-    straightenAction->setObjectName("straightenAction");
-    auto *straightenMoreAction = new QAction(tr("Straighten More"), this);
-    straightenMoreAction->setObjectName("straightenMoreAction");
-    auto *backgroundSubtractVideo = new QAction(tr("Background Subtract Video..."), this);
-    backgroundSubtractVideo->setObjectName("backgroundSubtractVideo");
+    m_straightenAction = new QAction(tr("Straighten"), this);
+    m_straightenMoreAction = new QAction(tr("Straighten More"), this);
+
+    m_firstImage = new QAction(style()->standardIcon(QStyle::SP_MediaSkipBackward), tr("First Image"), this);
+    m_lastImage = new QAction(style()->standardIcon(QStyle::SP_MediaSkipForward), tr("Last Images"), this);
+    m_nextImage = new QAction(style()->standardIcon(QStyle::SP_MediaSeekForward), tr("Next Image"), this);
+    m_previousImage = new QAction(style()->standardIcon(QStyle::SP_MediaSeekBackward), tr("Previous Images"), this);
 
     // Create toolbar
     auto *toolbar = addToolBar(tr("Main Toolbar"));
     toolbar->setObjectName("mainToolbar");  // useful for saving/restoring state
+    QWidgetAction *widgetAction;
 
     // Add actions
-    toolbar->addAction(inputFolderAction);
-    QLineEdit *edit = new QLineEdit(this);
-    edit->setPlaceholderText("Input Folder...");
-    //edit->setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Fixed);
-    //edit->setMinimumWidth(200);
-    QWidgetAction *editAction = new QWidgetAction(this);
-    editAction->setDefaultWidget(edit);
-    toolbar->addAction(editAction);
+    toolbar->addAction(m_firstImage);
+    toolbar->addAction(m_previousImage);
+    toolbar->addAction(m_nextImage);
+    toolbar->addAction(m_lastImage);
 
     toolbar->addSeparator();
 
-    toolbar->addAction(outputFolderAction);
-    QLineEdit *edit2 = new QLineEdit(this);
-    edit2->setPlaceholderText("Output Folder...");
-    //edit2->setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Fixed);
-    //edit2->setMinimumWidth(200);
-    QWidgetAction *editAction2 = new QWidgetAction(this);
-    editAction2->setDefaultWidget(edit2);
-    toolbar->addAction(editAction2);
+    m_spinBoxThreshold = new QSpinBox(this);
+    m_spinBoxThreshold->setMinimum(0);
+    m_spinBoxThreshold->setMaximum(255);
+    widgetAction = new QWidgetAction(this);
+    widgetAction->setDefaultWidget(m_spinBoxThreshold);
+    toolbar->addAction(widgetAction);
+
+    toolbar->addAction(m_inputFolderAction);
+    m_lineEditInputFolder = new QLineEdit(this);
+    m_lineEditInputFolder->setPlaceholderText("Input Folder...");
+    widgetAction = new QWidgetAction(this);
+    widgetAction->setDefaultWidget(m_lineEditInputFolder);
+    toolbar->addAction(widgetAction);
 
     toolbar->addSeparator();
-    toolbar->addAction(quitAction);
+
+    toolbar->addAction(m_outputFolderAction);
+    m_lineEditOutputFolder = new QLineEdit(this);
+    m_lineEditOutputFolder->setPlaceholderText("Output Folder...");
+    widgetAction = new QWidgetAction(this);
+    widgetAction->setDefaultWidget(m_lineEditOutputFolder);
+    toolbar->addAction(widgetAction);
 
     // Create menus
     QMenu *fileMenu = menuBar()->addMenu(tr("&File"));
-    fileMenu->addAction(openAction);
-    fileMenu->addAction(saveAction);
+    fileMenu->addAction(m_inputFolderAction);
+    fileMenu->addAction(m_outputFolderAction);
+    fileMenu->addSeparator();
     fileMenu->addSeparator();
     fileMenu->addAction(quitAction);
 
     QMenu *actionMenu = menuBar()->addMenu(tr("&Action"));
-    actionMenu->addAction(straightenAction);
-    actionMenu->addAction(straightenMoreAction);
-    actionMenu->addSeparator();
-    actionMenu->addAction(backgroundSubtractVideo);
+    actionMenu->addAction(m_straightenAction);
+    actionMenu->addAction(m_straightenMoreAction);
 
-    connect(openAction, &QAction::triggered, this, &MainWindow::openImage);
-    connect(saveAction, &QAction::triggered, this, &MainWindow::saveDocument);
+    // connect(openAction, &QAction::triggered, this, &MainWindow::openImage);
+    // connect(saveAction, &QAction::triggered, this, &MainWindow::saveDocument);
     connect(quitAction, &QAction::triggered, this, &MainWindow::close);
-    connect(straightenAction, &QAction::triggered, this, &MainWindow::straighten);
-    connect(straightenMoreAction, &QAction::triggered, this, &MainWindow::straightenMore);
-    connect(backgroundSubtractVideo, &QAction::triggered, this, &MainWindow::backgroundSubtractVideo);
+    connect(m_straightenAction, &QAction::triggered, this, &MainWindow::straighten);
+    connect(m_straightenMoreAction, &QAction::triggered, this, &MainWindow::straightenMore);
+    connect(m_inputFolderAction, &QAction::triggered, this, &MainWindow::inputFolder);
+    connect(m_outputFolderAction, &QAction::triggered, this, &MainWindow::outputFolder);
+    connect(m_firstImage, &QAction::triggered, this, &MainWindow::firstImage);
+    connect(m_lastImage, &QAction::triggered, this, &MainWindow::lastImage);
+    connect(m_nextImage, &QAction::triggered, this, &MainWindow::nextImage);
+    connect(m_previousImage, &QAction::triggered, this, &MainWindow::previousImage);
+    connect(m_lineEditInputFolder, &QLineEdit::editingFinished, this, &MainWindow::updateFileList);
 
-    setWindowTitle("Image Viewer");
+    setWindowTitle("Unbender");
 
     readSettings();
+    updateFileList();
+    firstImage();
     updateUI();
-
 }
 
 MainWindow::~MainWindow()
@@ -165,51 +175,45 @@ void MainWindow::closeEvent(QCloseEvent *event)
     }
 }
 
-void MainWindow::openImage()
+void MainWindow::openImage(const QString &filePath)
 {
-    QString fileName = QFileDialog::getOpenFileName(this, "Open Image", m_filePath, "Images (*.png *.jpg *.jpeg *.bmp *.gif);;Any File (*.* *)");
+    QImageReader reader(filePath);
+    reader.setAutoTransform(true);
+    QImage image = reader.read();
 
-    if (!fileName.isEmpty())
+    if (!image.isNull())
     {
-        m_filePath = fileName;
-        QImageReader reader(fileName);
-        reader.setAutoTransform(true);
-        QImage image = reader.read();
-
-        if (!image.isNull())
+        QGraphicsPixmapItem *item = new QGraphicsPixmapItem(QPixmap::fromImage(image));
+        m_view->clear();
+        m_view->setImage(item);
+        // m_view->fitInView(m_view->scene()->itemsBoundingRect(), Qt::KeepAspectRatio);
+        // I want to stadardise on the endedness independent QImage formats
+        switch (image.format())
         {
-            QGraphicsPixmapItem *item = new QGraphicsPixmapItem(QPixmap::fromImage(image));
-            m_view->clear();
-            m_view->setImage(item);
-            m_view->fitInView(m_view->scene()->itemsBoundingRect(), Qt::KeepAspectRatio);
-            // I want to stadardise on the endedness independent QImage formats
-            switch (image.format())
-            {
-            // these formats are used unchanged because they are endian indepenndent
-            case QImage::Format_Grayscale8:
-            case QImage::Format_RGB888:
-            case QImage::Format_RGBA8888:
-                m_image = std::make_unique<QImage>(image);
-                break;
-            // these formats need to be converted
-            case QImage::QImage::Format_Grayscale16:
-                m_image = std::make_unique<QImage>(image.convertToFormat(QImage::Format_Grayscale8));
-                break;
-            case QImage::QImage::Format_RGB32:
-                m_image = std::make_unique<QImage>(image.convertToFormat(QImage::Format_RGB888));
-                break;
-            case QImage::QImage::Format_ARGB32:
-                m_image = std::make_unique<QImage>(image.convertToFormat(QImage::Format_RGBA8888));
-                break;
-            // everything else to Format_RGB888
-            default:
-                m_image = std::make_unique<QImage>(image.convertToFormat(QImage::Format_RGB888));
-                break;
-            }
+        // these formats are used unchanged because they are endian indepenndent
+        case QImage::Format_Grayscale8:
+        case QImage::Format_RGB888:
+        case QImage::Format_RGBA8888:
+            m_image = std::make_unique<QImage>(image);
+            break;
+        // these formats need to be converted
+        case QImage::QImage::Format_Grayscale16:
+            m_image = std::make_unique<QImage>(image.convertToFormat(QImage::Format_Grayscale8));
+            break;
+        case QImage::QImage::Format_RGB32:
+            m_image = std::make_unique<QImage>(image.convertToFormat(QImage::Format_RGB888));
+            break;
+        case QImage::QImage::Format_ARGB32:
+            m_image = std::make_unique<QImage>(image.convertToFormat(QImage::Format_RGBA8888));
+            break;
+        // everything else to Format_RGB888
+        default:
+            m_image = std::make_unique<QImage>(image.convertToFormat(QImage::Format_RGB888));
+            break;
         }
-    }
 
-    updateUI();
+        updateUI();
+    }
 }
 
 void MainWindow::saveDocument()
@@ -219,6 +223,7 @@ void MainWindow::saveDocument()
 
 void MainWindow::straighten()
 {
+    m_findCentreLine.setThresholdValue(m_spinBoxThreshold->value());
     m_findCentreLine.setImg(OpenCVTools::convertQImageToMat(*m_image));
 
     MarkerItem *p1 = m_view->position1();
@@ -299,19 +304,26 @@ void MainWindow::straightenMore()
 
 void MainWindow::updateUI()
 {
-    findChild<QAction*>("openAction")->setEnabled(true);
-    findChild<QAction*>("quitAction")->setEnabled(true);
-    findChild<QAction*>("saveAction")->setEnabled(false);
-    findChild<QAction*>("straightenAction")->setEnabled(m_image != 0 && m_view->position1() && m_view->position2());
-    findChild<QAction*>("straightenMoreAction")->setEnabled(m_image != 0 && m_view->position1() && m_view->position2() && m_findCentreLine.polyA().size() && m_findCentreLine.polyB().size() && m_findCentreLine.centreLine().size());
-    findChild<QAction*>("backgroundSubtractVideo")->setEnabled(true);
-
+    QFileInfo inputFolderInfo(m_lineEditInputFolder->text());
+    QFileInfo outputFolderInfo(m_lineEditOutputFolder->text());
+    bool inputFolderValid = inputFolderInfo.isDir() && inputFolderInfo.isReadable();
+    bool outputFolderValid = outputFolderInfo.isDir() && outputFolderInfo.isReadable() && outputFolderInfo.isWritable();
+    m_inputFolderAction->setEnabled(true);
+    m_outputFolderAction->setEnabled(true);
+    m_straightenAction->setEnabled(inputFolderValid && outputFolderValid && m_image != 0 && m_view->position1() && m_view->position2());
+    m_straightenMoreAction->setEnabled(inputFolderValid && outputFolderValid && m_image != 0 && m_view->position1() && m_view->position2() && m_findCentreLine.polyA().size() && m_findCentreLine.polyB().size() && m_findCentreLine.centreLine().size());
+    m_firstImage->setEnabled(inputFolderValid && outputFolderValid && m_imageFileList.size() > 0 && m_imageFileListIndex > 0);
+    m_previousImage->setEnabled(inputFolderValid && outputFolderValid && m_imageFileList.size() > 0 && m_imageFileListIndex > 0);
+    m_nextImage->setEnabled(inputFolderValid && outputFolderValid && m_imageFileList.size() > 0 && m_imageFileListIndex < m_imageFileList.size() - 1);
+    m_lastImage->setEnabled(inputFolderValid && outputFolderValid && m_imageFileList.size() > 0 && m_imageFileListIndex < m_imageFileList.size() - 1);
 }
 
 void MainWindow::readSettings()
 {
     QSettings settings(QSettings::IniFormat, QSettings::UserScope, "AnimalSimulationLaboratory", "Unbender");
-    m_filePath = settings.value("lastFileOpened", "").toString();
+    m_lineEditInputFolder->setText(settings.value("inputFolder", "").toString());
+    m_lineEditOutputFolder->setText(settings.value("outputFolder", "").toString());
+    m_spinBoxThreshold->setValue(settings.value("threshold", "").toInt());
     restoreGeometry(settings.value("geometry").toByteArray());
     restoreState(settings.value("windowState").toByteArray());
     m_splitter->restoreState(settings.value("splitterState").toByteArray());
@@ -320,22 +332,101 @@ void MainWindow::readSettings()
 void MainWindow::writeSettings()
 {
     QSettings settings(QSettings::IniFormat, QSettings::UserScope, "AnimalSimulationLaboratory", "Unbender");
-    settings.setValue("lastFileOpened", m_filePath);
+    settings.setValue("inputFolder", m_lineEditInputFolder->text());
+    settings.setValue("outputFolder", m_lineEditOutputFolder->text());
+    settings.setValue("threshold", m_spinBoxThreshold->value());
     settings.setValue("splitterState", m_splitter->saveState());
     settings.setValue("geometry", saveGeometry());
     settings.setValue("windowState", saveState());
     settings.sync();
 }
 
-void MainWindow::backgroundSubtractVideo()
+void MainWindow::inputFolder()
 {
-    QString fileName = QFileDialog::getOpenFileName(this, "Open Movie", m_filePath, "Movies (*.avi *.mkv *.mov *.mp4);;Any File (*.* *)");
+    QString dir = QFileDialog::getExistingDirectory(this, "Input Folder", m_lineEditInputFolder->text());
 
-    if (!fileName.isEmpty())
+    if (!dir.isEmpty())
     {
-        std::filesystem::path inputPath = fileName.toStdString();
-        std::filesystem::path outputPath = inputPath;
-        outputPath.replace_filename(inputPath.stem().string() + "_no_bg.mp4");
-        OpenCVTools::subtractBackground(inputPath.string(), outputPath.string());
+        m_lineEditInputFolder->setText(dir);
+        updateFileList();
     }
+    updateUI();
+}
+
+void MainWindow::outputFolder()
+{
+    QString dir = QFileDialog::getExistingDirectory(this, "Output Folder", m_lineEditOutputFolder->text());
+
+    if (!dir.isEmpty())
+    {
+        m_lineEditOutputFolder->setText(dir);
+    }
+    updateUI();
+}
+
+void MainWindow::updateFileList()
+{
+    m_imageFileList.clear();
+    m_imageFileListIndex = -1;
+    QFileInfo inputFolderInfo(m_lineEditInputFolder->text());
+    bool inputFolderValid = inputFolderInfo.isDir() && inputFolderInfo.isReadable();
+    if (!inputFolderValid) {  return; }
+
+    QDir dir(m_lineEditInputFolder->text());
+    QStringList allFiles = dir.entryList(QDir::Files);
+    QRegularExpression re(m_imageFileMatchRegex, QRegularExpression::CaseInsensitiveOption);
+    for (auto &&file : allFiles)
+    {
+        if (re.match(file).hasMatch())
+        {
+            m_imageFileList << dir.absoluteFilePath(file);
+        }
+    }
+    updateUI();
+}
+
+void MainWindow::firstImage()
+{
+    if (m_imageFileList.size() == 0)
+    {
+        m_imageFileListIndex = -1;
+        return;
+    }
+    m_imageFileListIndex = 0;
+    openImage(m_imageFileList[m_imageFileListIndex]);
+}
+
+void MainWindow::lastImage()
+{
+    if (m_imageFileList.size() == 0)
+    {
+        m_imageFileListIndex = -1;
+        return;
+    }
+    m_imageFileListIndex = m_imageFileList.size() - 1;
+    openImage(m_imageFileList[m_imageFileListIndex]);
+}
+
+void MainWindow::nextImage()
+{
+    if (m_imageFileList.size() == 0)
+    {
+        m_imageFileListIndex = -1;
+        return;
+    }
+    ++m_imageFileListIndex;
+    if (m_imageFileListIndex >= m_imageFileList.size()) m_imageFileListIndex = m_imageFileList.size() - 1;
+    openImage(m_imageFileList[m_imageFileListIndex]);
+}
+
+void MainWindow::previousImage()
+{
+    if (m_imageFileList.size() == 0)
+    {
+        m_imageFileListIndex = -1;
+        return;
+    }
+    --m_imageFileListIndex;
+    if (m_imageFileListIndex < 0) m_imageFileListIndex = 0;
+    openImage(m_imageFileList[m_imageFileListIndex]);
 }
