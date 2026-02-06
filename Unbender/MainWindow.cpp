@@ -309,6 +309,7 @@ void MainWindow::straightenMore()
     auto mesh = m_findCentreLine.straightMesh();
     std::string objVersion = OpenCVTools::meshToOBJ(mesh, "straight_mesh");
     std::ofstream("C:\\Scratch\\output.obj") << objVersion;
+    m_meshView->setMeshes({mesh});
 
     updateUI();
 }

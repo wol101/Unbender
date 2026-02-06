@@ -101,7 +101,18 @@ void MeshViewWidget::paintGL()
     program.bind();
 
     QMatrix4x4 proj;
-    proj.perspective(45.0f, float(width())/float(height()), 0.01f, 1000.0f);
+    float aspect = float(width())/float(height());
+    float nearPlane = 0.1f;
+    float farPlane = 10000.0f;
+    // float fovY = 45.0f / zoomFactor;
+    // proj.perspective(fovY, aspect, nearPlane, farPlane);
+    float halfH = height() * 0.5f * zoomFactor;
+    float halfW = halfH * aspect;
+    float left   = -halfW;
+    float right  =  halfW;
+    float bottom = -halfH;
+    float top    =  halfH;
+    proj.ortho(left, right, bottom, top, nearPlane, farPlane);
 
     QMatrix4x4 view;
     view.translate(0,0,-distance);
@@ -170,9 +181,8 @@ void MeshViewWidget::mouseMoveEvent(QMouseEvent* e)
 
 void MeshViewWidget::wheelEvent(QWheelEvent* e)
 {
-    float zoomFactor = 1.0f - e->angleDelta().y() * 0.001f;
-    distance *= zoomFactor;
-    distance = std::max(0.1f, distance);
+    zoomFactor *= std::clamp(1.0f - e->angleDelta().y() * 0.001f, 0.5f, 2.0f);
+    zoomFactor = std::clamp(zoomFactor, 0.01f, 100.0f);
     update();
 }
 
@@ -221,6 +231,7 @@ void MeshViewWidget::updateBounds()
 
 void MeshViewWidget::frameScene()
 {
+    center = 0.5f * (minB + maxB);
     distance = radius * 2.5f;
     yaw = pitch = roll = 0.0f;
 }

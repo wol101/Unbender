@@ -37,10 +37,11 @@ protected:
     std::vector<GLMesh> glMeshes;
 
     // Camera state
-    float distance = 5.0f;
+    float distance = 1000.0f;
     float yaw = 0.0f;
     float pitch = 0.0f;
     float roll = 0.0f;
+    float zoomFactor = 1.0f;
     QPoint lastPos;
 
     // Scene bounds
