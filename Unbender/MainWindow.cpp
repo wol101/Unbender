@@ -23,6 +23,8 @@
 #include <QLineEdit>
 #include <QWidgetAction>
 #include <QSpinBox>
+#include <QLabel>
+#include <QCheckBox>
 
 #include <fstream>
 
@@ -85,12 +87,22 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent) , m_ui(new Ui::Mai
 
     toolbar->addSeparator();
 
+    QLabel* label = new QLabel("Threshold");
+    toolbar->addWidget(label);
     m_spinBoxThreshold = new QSpinBox(this);
     m_spinBoxThreshold->setMinimum(0);
     m_spinBoxThreshold->setMaximum(255);
     widgetAction = new QWidgetAction(this);
     widgetAction->setDefaultWidget(m_spinBoxThreshold);
     toolbar->addAction(widgetAction);
+
+    m_checkBoxInvertThreshold = new QCheckBox(this);
+    m_checkBoxInvertThreshold->setText("Invert");
+    widgetAction = new QWidgetAction(this);
+    widgetAction->setDefaultWidget(m_checkBoxInvertThreshold);
+    toolbar->addAction(widgetAction);
+
+    toolbar->addSeparator();
 
     toolbar->addAction(m_inputFolderAction);
     m_lineEditInputFolder = new QLineEdit(this);
@@ -324,6 +336,7 @@ void MainWindow::readSettings()
     m_lineEditInputFolder->setText(settings.value("inputFolder", "").toString());
     m_lineEditOutputFolder->setText(settings.value("outputFolder", "").toString());
     m_spinBoxThreshold->setValue(settings.value("threshold", "").toInt());
+    m_checkBoxInvertThreshold->setChecked(settings.value("invertThreshold", "").toBool());
     restoreGeometry(settings.value("geometry").toByteArray());
     restoreState(settings.value("windowState").toByteArray());
     m_splitter->restoreState(settings.value("splitterState").toByteArray());
@@ -335,6 +348,7 @@ void MainWindow::writeSettings()
     settings.setValue("inputFolder", m_lineEditInputFolder->text());
     settings.setValue("outputFolder", m_lineEditOutputFolder->text());
     settings.setValue("threshold", m_spinBoxThreshold->value());
+    settings.setValue("invertThreshold", m_checkBoxInvertThreshold->isChecked());
     settings.setValue("splitterState", m_splitter->saveState());
     settings.setValue("geometry", saveGeometry());
     settings.setValue("windowState", saveState());
@@ -382,7 +396,7 @@ void MainWindow::updateFileList()
             m_imageFileList << dir.absoluteFilePath(file);
         }
     }
-    updateUI();
+    firstImage();
 }
 
 void MainWindow::firstImage()

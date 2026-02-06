@@ -12,6 +12,7 @@ class QImage;
 class QSplitter;
 class QLineEdit;
 class QSpinBox;
+class QCheckBox;
 
 QT_BEGIN_NAMESPACE
 namespace Ui {
@@ -53,6 +54,7 @@ private:
     QLineEdit *m_lineEditInputFolder = 0;
     QLineEdit *m_lineEditOutputFolder = 0;
     QSpinBox *m_spinBoxThreshold = 0;
+    QCheckBox *m_checkBoxInvertThreshold = 0;
 
     QAction *m_inputFolderAction = 0;
     QAction *m_outputFolderAction = 0;
