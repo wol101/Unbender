@@ -5,7 +5,6 @@
 #include "MeshViewWidget.h"
 #include "OpenCVTools.h"
 #include "MarkerItem.h"
-#include "DualDirectoryDialog.h"
 
 #include <QGraphicsView>
 #include <QGraphicsScene>
@@ -21,6 +20,8 @@
 #include <QSplitter>
 #include <QStyle>
 #include <QToolBar>
+#include <QLineEdit>
+#include <QWidgetAction>
 
 #include <fstream>
 
@@ -63,6 +64,11 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent) , m_ui(new Ui::Mai
     auto *quitAction = new QAction(style()->standardIcon(QStyle::SP_DialogCloseButton), tr("Quit"), this);
     quitAction->setObjectName("quitAction");
 
+    auto *inputFolderAction = new QAction(style()->standardIcon(QStyle::SP_DialogOpenButton), tr("Input Folder..."), this);
+    inputFolderAction->setObjectName("openAction");
+    auto *outputFolderAction = new QAction(style()->standardIcon(QStyle::SP_DialogOpenButton), tr("Output Folder..."), this);
+    outputFolderAction->setObjectName("openAction");
+
     auto *straightenAction = new QAction(tr("Straighten"), this);
     straightenAction->setObjectName("straightenAction");
     auto *straightenMoreAction = new QAction(tr("Straighten More"), this);
@@ -75,8 +81,26 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent) , m_ui(new Ui::Mai
     toolbar->setObjectName("mainToolbar");  // useful for saving/restoring state
 
     // Add actions
-    toolbar->addAction(openAction);
-    toolbar->addAction(saveAction);
+    toolbar->addAction(inputFolderAction);
+    QLineEdit *edit = new QLineEdit(this);
+    edit->setPlaceholderText("Input Folder...");
+    //edit->setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Fixed);
+    //edit->setMinimumWidth(200);
+    QWidgetAction *editAction = new QWidgetAction(this);
+    editAction->setDefaultWidget(edit);
+    toolbar->addAction(editAction);
+
+    toolbar->addSeparator();
+
+    toolbar->addAction(outputFolderAction);
+    QLineEdit *edit2 = new QLineEdit(this);
+    edit2->setPlaceholderText("Output Folder...");
+    //edit2->setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Fixed);
+    //edit2->setMinimumWidth(200);
+    QWidgetAction *editAction2 = new QWidgetAction(this);
+    editAction2->setDefaultWidget(edit2);
+    toolbar->addAction(editAction2);
+
     toolbar->addSeparator();
     toolbar->addAction(quitAction);
 
@@ -143,12 +167,6 @@ void MainWindow::closeEvent(QCloseEvent *event)
 
 void MainWindow::openImage()
 {
-    DualDirectoryDialog *dialog = new DualDirectoryDialog(this);
-    int status = dialog->exec();
-    if (status == QDialog::Accepted)
-    {
-    }
-    /*
     QString fileName = QFileDialog::getOpenFileName(this, "Open Image", m_filePath, "Images (*.png *.jpg *.jpeg *.bmp *.gif);;Any File (*.* *)");
 
     if (!fileName.isEmpty())
@@ -190,7 +208,7 @@ void MainWindow::openImage()
             }
         }
     }
-    */
+
     updateUI();
 }
 

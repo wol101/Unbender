@@ -35,7 +35,7 @@ if(${QT_VERSION_MAJOR} GREATER_EQUAL 6)
         Image.h
         OpenCVTools.h OpenCVTools.cpp
         MeshViewWidget.h MeshViewWidget.cpp
-        DualDirectoryDialog.h DualDirectoryDialog.cpp
+
 
 
 
