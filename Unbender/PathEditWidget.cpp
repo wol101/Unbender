@@ -7,13 +7,13 @@
 #include <QMimeData>
 #include <QUrl>
 
-PathEditWidget::PathEditWidget(Mode mode, const QString &buttonText, QWidget* parent)
+PathEditWidget::PathEditWidget(Mode mode, const QString &startPath, const QString &buttonText, QWidget* parent)
     : QWidget(parent),
     m_mode(mode)
 {
     setAcceptDrops(true);
 
-    m_edit = new QLineEdit(this);
+    m_edit = new QLineEdit(startPath, this);
     m_button = new QPushButton(buttonText, this);
 
     auto* layout = new QHBoxLayout(this);

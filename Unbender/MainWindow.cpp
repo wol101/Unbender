@@ -45,10 +45,17 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent) , m_ui(new Ui::Mai
 
     // Horizontal splitter
     m_splitter = new QSplitter(Qt::Horizontal, central);
+    m_splitter->setHandleWidth(10);   // default is usually 1–3 px
     layout->addWidget(m_splitter);
 
     // Left side: the sidebar
     m_sidebar = new Sidebar(this);
+    m_sidebar->addPathEditWidget("Frames", "framesFolder", PathEditWidget::DirectoryMode, "");
+    m_sidebar->addPathEditWidget("Masks", "masksFolder", PathEditWidget::DirectoryMode, "");
+    m_sidebar->addPathEditWidget("Output", "outputFolder", PathEditWidget::DirectoryMode, "");
+    m_sidebar->addSpinBox("Threshold", "threshold", 0, 255, 127);
+    m_sidebar->addCheckBox("Invert", "invert", 0);
+    m_sidebar->addSpacer();
 
     // Right side: the four pane viewport
 
@@ -71,14 +78,10 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent) , m_ui(new Ui::Mai
     m_splitter->addWidget(m_fourPaneViewport);
 
     // Force even split
-    m_splitter->setSizes({1, 1});
+    m_splitter->setSizes({1, 4});
 
     // Create actions
-    // auto *saveAction = new QAction(style()->standardIcon(QStyle::SP_DialogSaveButton), tr("Save"), this);
     auto *quitAction = new QAction(style()->standardIcon(QStyle::SP_TitleBarCloseButton), tr("Quit"), this);
-
-    m_inputFolderAction = new QAction(style()->standardIcon(QStyle::SP_DialogOpenButton), tr("Input Folder..."), this);
-    m_outputFolderAction = new QAction(style()->standardIcon(QStyle::SP_DialogOpenButton), tr("Output Folder..."), this);
 
     m_straightenAction = new QAction(tr("Straighten"), this);
     m_straightenMoreAction = new QAction(tr("Straighten More"), this);
@@ -99,47 +102,8 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent) , m_ui(new Ui::Mai
     toolbar->addAction(m_nextImage);
     toolbar->addAction(m_lastImage);
 
-    toolbar->addSeparator();
-
-    QLabel* label = new QLabel("Threshold");
-    toolbar->addWidget(label);
-    m_spinBoxThreshold = new QSpinBox(this);
-    m_spinBoxThreshold->setMinimum(0);
-    m_spinBoxThreshold->setMaximum(255);
-    widgetAction = new QWidgetAction(this);
-    widgetAction->setDefaultWidget(m_spinBoxThreshold);
-    toolbar->addAction(widgetAction);
-
-    m_checkBoxInvertThreshold = new QCheckBox(this);
-    m_checkBoxInvertThreshold->setText("Invert");
-    widgetAction = new QWidgetAction(this);
-    widgetAction->setDefaultWidget(m_checkBoxInvertThreshold);
-    toolbar->addAction(widgetAction);
-
-    toolbar->addSeparator();
-
-    toolbar->addAction(m_inputFolderAction);
-    m_lineEditInputFolder = new QLineEdit(this);
-    m_lineEditInputFolder->setPlaceholderText("Input Folder...");
-    widgetAction = new QWidgetAction(this);
-    widgetAction->setDefaultWidget(m_lineEditInputFolder);
-    toolbar->addAction(widgetAction);
-
-    toolbar->addSeparator();
-
-    toolbar->addAction(m_outputFolderAction);
-    m_lineEditOutputFolder = new QLineEdit(this);
-    m_lineEditOutputFolder->setPlaceholderText("Output Folder...");
-    widgetAction = new QWidgetAction(this);
-    widgetAction->setDefaultWidget(m_lineEditOutputFolder);
-    toolbar->addAction(widgetAction);
-
     // Create menus
     QMenu *fileMenu = menuBar()->addMenu(tr("&File"));
-    fileMenu->addAction(m_inputFolderAction);
-    fileMenu->addAction(m_outputFolderAction);
-    fileMenu->addSeparator();
-    fileMenu->addSeparator();
     fileMenu->addAction(quitAction);
 
     QMenu *actionMenu = menuBar()->addMenu(tr("&Action"));
@@ -151,13 +115,10 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent) , m_ui(new Ui::Mai
     connect(quitAction, &QAction::triggered, this, &MainWindow::close);
     connect(m_straightenAction, &QAction::triggered, this, &MainWindow::straighten);
     connect(m_straightenMoreAction, &QAction::triggered, this, &MainWindow::straightenMore);
-    connect(m_inputFolderAction, &QAction::triggered, this, &MainWindow::inputFolder);
-    connect(m_outputFolderAction, &QAction::triggered, this, &MainWindow::outputFolder);
     connect(m_firstImage, &QAction::triggered, this, &MainWindow::firstImage);
     connect(m_lastImage, &QAction::triggered, this, &MainWindow::lastImage);
     connect(m_nextImage, &QAction::triggered, this, &MainWindow::nextImage);
     connect(m_previousImage, &QAction::triggered, this, &MainWindow::previousImage);
-    connect(m_lineEditInputFolder, &QLineEdit::editingFinished, this, &MainWindow::updateFileList);
 
     setWindowTitle("Unbender");
 
@@ -249,7 +210,7 @@ void MainWindow::saveDocument()
 
 void MainWindow::straighten()
 {
-    m_findCentreLine.setThresholdValue(m_spinBoxThreshold->value());
+    m_findCentreLine.setThresholdValue(m_sidebar->spinBox("threshold")->value());
     m_findCentreLine.setImg(OpenCVTools::convertQImageToMat(*m_image));
 
     MarkerItem *p1 = m_processedView->position1();
@@ -331,12 +292,10 @@ void MainWindow::straightenMore()
 
 void MainWindow::updateUI()
 {
-    QFileInfo inputFolderInfo(m_lineEditInputFolder->text());
-    QFileInfo outputFolderInfo(m_lineEditOutputFolder->text());
+    QFileInfo inputFolderInfo(m_sidebar->pathEditWidget("masksFolder")->path());
+    QFileInfo outputFolderInfo(m_sidebar->pathEditWidget("outputFolder")->path());
     bool inputFolderValid = inputFolderInfo.isDir() && inputFolderInfo.isReadable();
     bool outputFolderValid = outputFolderInfo.isDir() && outputFolderInfo.isReadable() && outputFolderInfo.isWritable();
-    m_inputFolderAction->setEnabled(true);
-    m_outputFolderAction->setEnabled(true);
     m_straightenAction->setEnabled(inputFolderValid && outputFolderValid && m_image != 0 && m_processedView->position1() && m_processedView->position2());
     m_straightenMoreAction->setEnabled(inputFolderValid && outputFolderValid && m_image != 0 && m_processedView->position1() && m_processedView->position2() && m_findCentreLine.polyA().size() && m_findCentreLine.polyB().size() && m_findCentreLine.centreLine().size());
     m_firstImage->setEnabled(inputFolderValid && outputFolderValid && m_imageFileList.size() > 0 && m_imageFileListIndex > 0);
@@ -348,60 +307,39 @@ void MainWindow::updateUI()
 void MainWindow::readSettings()
 {
     QSettings settings(QSettings::IniFormat, QSettings::UserScope, "AnimalSimulationLaboratory", "Unbender");
-    m_lineEditInputFolder->setText(settings.value("inputFolder", "").toString());
-    m_lineEditOutputFolder->setText(settings.value("outputFolder", "").toString());
-    m_spinBoxThreshold->setValue(settings.value("threshold", "").toInt());
-    m_checkBoxInvertThreshold->setChecked(settings.value("invertThreshold", "").toBool());
     restoreGeometry(settings.value("geometry").toByteArray());
     restoreState(settings.value("windowState").toByteArray());
     m_splitter->restoreState(settings.value("splitterState").toByteArray());
+    m_sidebar->pathEditWidget("framesFolder")->setPath(settings.value("framesFolder", "").toString());
+    m_sidebar->pathEditWidget("masksFolder")->setPath(settings.value("masksFolder", "").toString());
+    m_sidebar->pathEditWidget("outputFolder")->setPath(settings.value("outputFolder", "").toString());
+    m_sidebar->spinBox("threshold")->setValue(settings.value("threshold", "127").toInt());
+    m_sidebar->checkBox("invert")->setChecked(settings.value("invert", "0").toBool());
 }
 
 void MainWindow::writeSettings()
 {
     QSettings settings(QSettings::IniFormat, QSettings::UserScope, "AnimalSimulationLaboratory", "Unbender");
-    settings.setValue("inputFolder", m_lineEditInputFolder->text());
-    settings.setValue("outputFolder", m_lineEditOutputFolder->text());
-    settings.setValue("threshold", m_spinBoxThreshold->value());
-    settings.setValue("invertThreshold", m_checkBoxInvertThreshold->isChecked());
+    settings.setValue("framesFolder", m_sidebar->pathEditWidget("framesFolder")->path());
+    settings.setValue("masksFolder", m_sidebar->pathEditWidget("masksFolder")->path());
+    settings.setValue("outputFolder", m_sidebar->pathEditWidget("outputFolder")->path());
+    settings.setValue("threshold", m_sidebar->spinBox("threshold")->value());
+    settings.setValue("invert", m_sidebar->checkBox("invert")->isChecked());
     settings.setValue("splitterState", m_splitter->saveState());
     settings.setValue("geometry", saveGeometry());
     settings.setValue("windowState", saveState());
     settings.sync();
 }
 
-void MainWindow::inputFolder()
-{
-    QString dir = QFileDialog::getExistingDirectory(this, "Input Folder", m_lineEditInputFolder->text());
-
-    if (!dir.isEmpty())
-    {
-        m_lineEditInputFolder->setText(dir);
-        updateFileList();
-    }
-    updateUI();
-}
-
-void MainWindow::outputFolder()
-{
-    QString dir = QFileDialog::getExistingDirectory(this, "Output Folder", m_lineEditOutputFolder->text());
-
-    if (!dir.isEmpty())
-    {
-        m_lineEditOutputFolder->setText(dir);
-    }
-    updateUI();
-}
-
 void MainWindow::updateFileList()
 {
     m_imageFileList.clear();
     m_imageFileListIndex = -1;
-    QFileInfo inputFolderInfo(m_lineEditInputFolder->text());
+    QFileInfo inputFolderInfo(m_sidebar->pathEditWidget("masksFolder")->path());
     bool inputFolderValid = inputFolderInfo.isDir() && inputFolderInfo.isReadable();
     if (!inputFolderValid) {  return; }
 
-    QDir dir(m_lineEditInputFolder->text());
+    QDir dir(inputFolderInfo.absoluteFilePath());
     QStringList allFiles = dir.entryList(QDir::Files);
     QRegularExpression re(m_imageFileMatchRegex, QRegularExpression::CaseInsensitiveOption);
     for (auto &&file : allFiles)

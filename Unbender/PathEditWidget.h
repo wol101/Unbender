@@ -15,7 +15,7 @@ public:
         DirectoryMode
     };
 
-    explicit PathEditWidget(Mode mode, const QString& buttonText = "Browse...", QWidget* parent = nullptr);
+    explicit PathEditWidget(Mode mode, const QString &startPath = "", const QString& buttonText = "Browse...", QWidget* parent = nullptr);
 
     QString path() const;
     void setPath(const QString& p);

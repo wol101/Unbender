@@ -9,21 +9,6 @@ Sidebar::Sidebar(QWidget* parent)
     m_layout->setContentsMargins(6, 6, 6, 6);
     m_layout->setHorizontalSpacing(10);
     m_layout->setVerticalSpacing(6);
-
-    //
-    // Example controls — replace or extend as needed
-    //
-    addCheckBox("Enable Shadows", "enableShadows", true);
-    addCheckBox("Wireframe Mode", "wireframe", false);
-
-    addSpinBox("Detail Level", "detailLevel", 1, 10, 5);
-    addSpinBox("Max Iterations", "maxIterations", 1, 1000, 100);
-
-
-    // Add spacer to force top alignment
-    //
-    m_layout->setRowStretch(m_row, 1);
-
 }
 
 void Sidebar::addCheckBox(const QString& label, const QString& key, bool defaultValue)
@@ -55,6 +40,27 @@ void Sidebar::addSpinBox(const QString& label, const QString& key,
     m_row++;
 }
 
+void Sidebar::addPathEditWidget(const QString& label, const QString& key, PathEditWidget::Mode mode, QString startPath)
+{
+    auto* lbl = new QLabel(label, this);
+    auto* pewb  = new PathEditWidget(mode, startPath, "Browse...", this);
+
+    m_layout->addWidget(lbl, m_row, 0);
+    m_layout->addWidget(pewb,  m_row, 1);
+
+    m_pathEditWidgets.insert(key, pewb);
+    m_row++;
+}
+
+void Sidebar::addSpacer()
+{
+    // Add spacer to force top alignment
+    //
+    m_layout->setRowStretch(m_row, 1);
+    m_row++;
+}
+
+
 QCheckBox* Sidebar::checkBox(const QString& key) const
 {
     return m_checkBoxes.value(key, nullptr);
@@ -63,4 +69,9 @@ QCheckBox* Sidebar::checkBox(const QString& key) const
 QSpinBox* Sidebar::spinBox(const QString& key) const
 {
     return m_spinBoxes.value(key, nullptr);
+}
+
+PathEditWidget* Sidebar::pathEditWidget(const QString& key) const
+{
+    return m_pathEditWidgets.value(key, nullptr);
 }

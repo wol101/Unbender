@@ -32,16 +32,19 @@ void FourPaneViewport::buildLayout()
 
     // Left vertical splitter
     m_leftSplitter = new QSplitter(Qt::Vertical, this);
+    m_leftSplitter->setHandleWidth(8);   // default is usually 1–3 px
     m_leftSplitter->addWidget(m_panes[0]); // TL
     m_leftSplitter->addWidget(m_panes[2]); // BL
 
     // Right vertical splitter
     m_rightSplitter = new QSplitter(Qt::Vertical, this);
+    m_rightSplitter->setHandleWidth(8);   // default is usually 1–3 px
     m_rightSplitter->addWidget(m_panes[1]); // TR
     m_rightSplitter->addWidget(m_panes[3]); // BR
 
     // Main horizontal splitter
     m_mainSplitter = new QSplitter(Qt::Horizontal, this);
+    m_mainSplitter->setHandleWidth(8);   // default is usually 1–3 px
     m_mainSplitter->addWidget(m_leftSplitter);
     m_mainSplitter->addWidget(m_rightSplitter);
 
@@ -57,6 +60,7 @@ void FourPaneViewport::showEvent(QShowEvent* event)
 {
     QWidget::showEvent(event);
     loadSettings();
+    syncVerticalSplitters(m_leftSplitter, m_rightSplitter); // should not be needed but sometimes the wrong values get into the preferences
 }
 
 void FourPaneViewport::loadSettings()
@@ -184,12 +188,5 @@ void FourPaneViewport::resetPaneSizes()
     // Reset vertical splitters (top vs bottom)
     m_leftSplitter->setSizes({1, 1});
     m_rightSplitter->setSizes({1, 1});
-
-    // If you sync vertical splitters, ensure they stay in sync
-    if (!m_syncing) {
-        m_syncing = true;
-        m_rightSplitter->setSizes(m_leftSplitter->sizes());
-        m_syncing = false;
-    }
 }
 

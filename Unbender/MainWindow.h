@@ -40,8 +40,6 @@ private slots:
     void saveDocument();
     void straighten();
     void straightenMore();
-    void inputFolder();
-    void outputFolder();
     void updateFileList();
     void firstImage();
     void lastImage();
@@ -59,13 +57,7 @@ private:
     GraphicsView *m_processedView = 0;
     MeshViewWidget* m_meshView = 0;
     QSplitter* m_splitter = 0;
-    QLineEdit *m_lineEditInputFolder = 0;
-    QLineEdit *m_lineEditOutputFolder = 0;
-    QSpinBox *m_spinBoxThreshold = 0;
-    QCheckBox *m_checkBoxInvertThreshold = 0;
 
-    QAction *m_inputFolderAction = 0;
-    QAction *m_outputFolderAction = 0;
     QAction *m_straightenAction = 0;
     QAction *m_straightenMoreAction = 0;
     QAction *m_firstImage = 0;
@@ -82,7 +74,6 @@ private:
     void readSettings();
     void writeSettings();
     void openImage(const QString &filePath);
-
 
     FindCentreLine m_findCentreLine;
 
