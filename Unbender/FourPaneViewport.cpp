@@ -76,7 +76,7 @@ void FourPaneViewport::loadSettings()
 
 void FourPaneViewport::saveSettings()
 {
-    QSettings s;
+    QSettings s(QSettings::IniFormat, QSettings::UserScope, "AnimalSimulationLaboratory", "Unbender");
     s.beginGroup(SETTINGS_GROUP);
 
     s.setValue("main",  m_mainSplitter->saveState());
