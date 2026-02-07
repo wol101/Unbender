@@ -1,6 +1,7 @@
 #ifndef SIDEBAR_H
 #define SIDEBAR_H
 
+
 #include "PathEditWidget.h"
 
 #include <QWidget>
