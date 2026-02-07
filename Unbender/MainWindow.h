@@ -7,6 +7,9 @@
 
 class GraphicsView;
 class MeshViewWidget;
+class Sidebar;
+class FourPaneViewport;
+
 class QGraphicsScene;
 class QImage;
 class QSplitter;
@@ -48,7 +51,12 @@ private slots:
 private:
     Ui::MainWindow *m_ui = 0;
 
-    GraphicsView *m_view = 0;
+    Sidebar *m_sidebar;
+    FourPaneViewport *m_fourPaneViewport;
+
+    GraphicsView *m_originalView = 0;
+    GraphicsView *m_maskView = 0;
+    GraphicsView *m_processedView = 0;
     MeshViewWidget* m_meshView = 0;
     QSplitter* m_splitter = 0;
     QLineEdit *m_lineEditInputFolder = 0;

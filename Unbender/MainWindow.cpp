@@ -5,6 +5,8 @@
 #include "MeshViewWidget.h"
 #include "OpenCVTools.h"
 #include "MarkerItem.h"
+#include "Sidebar.h"
+#include "FourPaneViewport.h"
 
 #include <QGraphicsView>
 #include <QGraphicsScene>
@@ -45,16 +47,28 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent) , m_ui(new Ui::Mai
     m_splitter = new QSplitter(Qt::Horizontal, central);
     layout->addWidget(m_splitter);
 
-    // Left side: customised GraphicsView
-    QGraphicsScene* scene = new QGraphicsScene(this);
-    m_view = new GraphicsView(scene);
+    // Left side: the sidebar
+    m_sidebar = new Sidebar(this);
 
-    // Right side: your custom OpenGL widget
+    // Right side: the four pane viewport
+
+    // 3 of the views are image viewers
+    QGraphicsScene *scene;
+    scene = new QGraphicsScene(this);
+    m_originalView = new GraphicsView(scene);
+    scene = new QGraphicsScene(this);
+    m_maskView = new GraphicsView(scene);
+    scene = new QGraphicsScene(this);
+    m_processedView = new GraphicsView(scene);
+
+    // 1 view is the 3D mesh viewer
     m_meshView = new MeshViewWidget(this);
 
+    m_fourPaneViewport = new FourPaneViewport(m_originalView, m_maskView, m_processedView, m_meshView, this);
+
     // Add widgets to splitter
-    m_splitter->addWidget(m_view);
-    m_splitter->addWidget(m_meshView);
+    m_splitter->addWidget(m_sidebar);
+    m_splitter->addWidget(m_fourPaneViewport);
 
     // Force even split
     m_splitter->setSizes({1, 1});
@@ -196,9 +210,9 @@ void MainWindow::openImage(const QString &filePath)
     if (!image.isNull())
     {
         QGraphicsPixmapItem *item = new QGraphicsPixmapItem(QPixmap::fromImage(image));
-        m_view->clear();
-        m_view->setImage(item);
-        // m_view->fitInView(m_view->scene()->itemsBoundingRect(), Qt::KeepAspectRatio);
+        m_processedView->clear();
+        m_processedView->setImage(item);
+        // m_processedView->fitInView(m_processedView->scene()->itemsBoundingRect(), Qt::KeepAspectRatio);
         // I want to stadardise on the endedness independent QImage formats
         switch (image.format())
         {
@@ -238,25 +252,25 @@ void MainWindow::straighten()
     m_findCentreLine.setThresholdValue(m_spinBoxThreshold->value());
     m_findCentreLine.setImg(OpenCVTools::convertQImageToMat(*m_image));
 
-    MarkerItem *p1 = m_view->position1();
+    MarkerItem *p1 = m_processedView->position1();
     m_findCentreLine.setUserPoint1(cv::Point2f(p1->pos().x(), p1->pos().y()));
-    MarkerItem *p2 = m_view->position2();
+    MarkerItem *p2 = m_processedView->position2();
     m_findCentreLine.setUserPoint2(cv::Point2f(p2->pos().x(), p2->pos().y()));
 
     m_findCentreLine.straighten();
 
     QImage thresholdImage = OpenCVTools::convertMatToQImage(m_findCentreLine.thresh());
-    m_view->setImage(new QGraphicsPixmapItem(QPixmap::fromImage(thresholdImage)));
+    m_processedView->setImage(new QGraphicsPixmapItem(QPixmap::fromImage(thresholdImage)));
 
     QGraphicsPathItem *item;
     item = new QGraphicsPathItem(OpenCVTools::convertPolylineToQPainterPath(m_findCentreLine.polyA(), false));
     item->setPen(QPen(Qt::cyan, 2));
     item->setBrush(Qt::NoBrush);
-    m_view->addExtraItem(item);
+    m_processedView->addExtraItem(item);
     item = new QGraphicsPathItem(OpenCVTools::convertPolylineToQPainterPath(m_findCentreLine.polyB(), false));
     item->setPen(QPen(Qt::magenta, 2));
     item->setBrush(Qt::NoBrush);
-    m_view->addExtraItem(item);
+    m_processedView->addExtraItem(item);
 
     auto stickList = m_findCentreLine.stickList();
     for (size_t i = 0; i < stickList.size(); ++i)
@@ -264,13 +278,13 @@ void MainWindow::straighten()
         item = new QGraphicsPathItem(OpenCVTools::convertPolylineToQPainterPath(stickList[i], false));
         item->setPen(QPen(Qt::darkYellow, 1));
         item->setBrush(Qt::NoBrush);
-        m_view->addExtraItem(item);
+        m_processedView->addExtraItem(item);
     }
 
     item = new QGraphicsPathItem(OpenCVTools::convertPolylineToQPainterPath(m_findCentreLine.centreLine(), false));
     item->setPen(QPen(Qt::yellow, 2));
     item->setBrush(Qt::NoBrush);
-    m_view->addExtraItem(item);
+    m_processedView->addExtraItem(item);
 
     updateUI();
 }
@@ -279,16 +293,16 @@ void MainWindow::straightenMore()
 {
     m_findCentreLine.straightenMore();
 
-    m_view->clearExtrasItems();
+    m_processedView->clearExtrasItems();
     QGraphicsPathItem *item;
     item = new QGraphicsPathItem(OpenCVTools::convertPolylineToQPainterPath(m_findCentreLine.polyA(), false));
     item->setPen(QPen(Qt::cyan, 2));
     item->setBrush(Qt::NoBrush);
-    m_view->addExtraItem(item);
+    m_processedView->addExtraItem(item);
     item = new QGraphicsPathItem(OpenCVTools::convertPolylineToQPainterPath(m_findCentreLine.polyB(), false));
     item->setPen(QPen(Qt::magenta, 2));
     item->setBrush(Qt::NoBrush);
-    m_view->addExtraItem(item);
+    m_processedView->addExtraItem(item);
 
     auto stickList = m_findCentreLine.stickList();
     for (size_t i = 0; i < stickList.size(); ++i)
@@ -296,14 +310,14 @@ void MainWindow::straightenMore()
         item = new QGraphicsPathItem(OpenCVTools::convertPolylineToQPainterPath(stickList[i], false));
         item->setPen(QPen(Qt::darkGreen, 1));
         item->setBrush(Qt::NoBrush);
-        m_view->addExtraItem(item);
+        m_processedView->addExtraItem(item);
     }
 
 
     item = new QGraphicsPathItem(OpenCVTools::convertPolylineToQPainterPath(m_findCentreLine.centreLine(), false));
     item->setPen(QPen(Qt::green, 1));
     item->setBrush(Qt::NoBrush);
-    m_view->addExtraItem(item);
+    m_processedView->addExtraItem(item);
 
     m_findCentreLine.createStraightVersion();
     auto mesh = m_findCentreLine.straightMesh();
@@ -323,8 +337,8 @@ void MainWindow::updateUI()
     bool outputFolderValid = outputFolderInfo.isDir() && outputFolderInfo.isReadable() && outputFolderInfo.isWritable();
     m_inputFolderAction->setEnabled(true);
     m_outputFolderAction->setEnabled(true);
-    m_straightenAction->setEnabled(inputFolderValid && outputFolderValid && m_image != 0 && m_view->position1() && m_view->position2());
-    m_straightenMoreAction->setEnabled(inputFolderValid && outputFolderValid && m_image != 0 && m_view->position1() && m_view->position2() && m_findCentreLine.polyA().size() && m_findCentreLine.polyB().size() && m_findCentreLine.centreLine().size());
+    m_straightenAction->setEnabled(inputFolderValid && outputFolderValid && m_image != 0 && m_processedView->position1() && m_processedView->position2());
+    m_straightenMoreAction->setEnabled(inputFolderValid && outputFolderValid && m_image != 0 && m_processedView->position1() && m_processedView->position2() && m_findCentreLine.polyA().size() && m_findCentreLine.polyB().size() && m_findCentreLine.centreLine().size());
     m_firstImage->setEnabled(inputFolderValid && outputFolderValid && m_imageFileList.size() > 0 && m_imageFileListIndex > 0);
     m_previousImage->setEnabled(inputFolderValid && outputFolderValid && m_imageFileList.size() > 0 && m_imageFileListIndex > 0);
     m_nextImage->setEnabled(inputFolderValid && outputFolderValid && m_imageFileList.size() > 0 && m_imageFileListIndex < m_imageFileList.size() - 1);

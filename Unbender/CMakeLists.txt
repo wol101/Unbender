@@ -35,6 +35,9 @@ if(${QT_VERSION_MAJOR} GREATER_EQUAL 6)
         Image.h
         OpenCVTools.h OpenCVTools.cpp
         MeshViewWidget.h MeshViewWidget.cpp
+        FourPaneViewport.h FourPaneViewport.cpp
+        PathEditWidget.h PathEditWidget.cpp
+        Sidebar.h Sidebar.cpp
 
 
 
