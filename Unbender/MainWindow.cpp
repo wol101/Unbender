@@ -110,8 +110,6 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent) , m_ui(new Ui::Mai
     actionMenu->addAction(m_straightenAction);
     actionMenu->addAction(m_straightenMoreAction);
 
-    // connect(openAction, &QAction::triggered, this, &MainWindow::openImage);
-    // connect(saveAction, &QAction::triggered, this, &MainWindow::saveDocument);
     connect(quitAction, &QAction::triggered, this, &MainWindow::close);
     connect(m_straightenAction, &QAction::triggered, this, &MainWindow::straighten);
     connect(m_straightenMoreAction, &QAction::triggered, this, &MainWindow::straightenMore);

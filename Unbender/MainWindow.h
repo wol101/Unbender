@@ -67,7 +67,7 @@ private:
 
     QStringList m_imageFileList;
     int m_imageFileListIndex = -1;
-    QString m_imageFileMatchRegex = "mask.*\\.png";
+    QString m_imageFileMatchRegex = "^.*\\.png$";
     std::unique_ptr<QImage> m_image;
     bool m_unsavedChanges = false;
 

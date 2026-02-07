@@ -167,6 +167,13 @@ void FourPaneViewport::showContextMenu(QWidget* pane, const QPoint& globalPos)
         });
     }
 
+    QAction* resetAct = menu.addAction("Reset Pane Sizes");
+    connect(resetAct, &QAction::triggered, this, [this]() {
+        resetPaneSizes();
+    });
+
+
+
     menu.exec(globalPos);
 }
 
