@@ -347,7 +347,6 @@ void MainWindow::updateFileList()
             m_imageFileList << dir.absoluteFilePath(file);
         }
     }
-    firstImage();
 }
 
 void MainWindow::firstImage()

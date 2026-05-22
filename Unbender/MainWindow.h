@@ -65,10 +65,17 @@ private:
     QAction *m_nextImage = 0;
     QAction *m_previousImage = 0;
 
+    struct ImageSet
+    {
+        std::unique_ptr<QImage> originalView;
+        std::unique_ptr<QImage> maskView;
+        std::unique_ptr<QImage> processedView;
+        const std::vector<OpenCVTools::Mesh> processedMesh;
+    };
     QStringList m_imageFileList;
     int m_imageFileListIndex = -1;
     QString m_imageFileMatchRegex = "^.*\\.png$";
-    std::unique_ptr<QImage> m_image;
+    ImageSet m_imageSet;
     bool m_unsavedChanges = false;
 
     void readSettings();
