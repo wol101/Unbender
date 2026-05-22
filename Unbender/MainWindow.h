@@ -67,10 +67,10 @@ private:
 
     struct ImageSet
     {
-        std::unique_ptr<QImage> originalView;
-        std::unique_ptr<QImage> maskView;
-        std::unique_ptr<QImage> processedView;
-        const std::vector<OpenCVTools::Mesh> processedMesh;
+        std::unique_ptr<QImage> originalImage;
+        std::unique_ptr<QImage> maskImage;
+        std::unique_ptr<QImage> outputImage;
+        const std::vector<OpenCVTools::Mesh> outputMesh;
     };
     QStringList m_imageFileList;
     int m_imageFileListIndex = -1;

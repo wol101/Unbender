@@ -52,7 +52,8 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent) , m_ui(new Ui::Mai
     m_sidebar = new Sidebar(this);
     m_sidebar->addPathEditWidget("Frames", "framesFolder", PathEditWidget::DirectoryMode, "");
     m_sidebar->addPathEditWidget("Masks", "masksFolder", PathEditWidget::DirectoryMode, "");
-    m_sidebar->addPathEditWidget("Output", "outputFolder", PathEditWidget::DirectoryMode, "");
+    m_sidebar->addPathEditWidget("Output Images", "outputImageFolder", PathEditWidget::DirectoryMode, "");
+    m_sidebar->addPathEditWidget("Output Meshes", "outputMeshFolder", PathEditWidget::DirectoryMode, "");
     m_sidebar->addSpinBox("Threshold", "threshold", 0, 255, 127);
     m_sidebar->addCheckBox("Invert", "invert", 0);
     m_sidebar->addSpacer();
@@ -291,15 +292,17 @@ void MainWindow::straightenMore()
 void MainWindow::updateUI()
 {
     QFileInfo inputFolderInfo(m_sidebar->pathEditWidget("masksFolder")->path());
-    QFileInfo outputFolderInfo(m_sidebar->pathEditWidget("outputFolder")->path());
+    QFileInfo outputImageFolderInfo(m_sidebar->pathEditWidget("outputImageFolder")->path());
+    QFileInfo outputMeshFolderInfo(m_sidebar->pathEditWidget("outputMeshFolder")->path());
     bool inputFolderValid = inputFolderInfo.isDir() && inputFolderInfo.isReadable();
-    bool outputFolderValid = outputFolderInfo.isDir() && outputFolderInfo.isReadable() && outputFolderInfo.isWritable();
-    m_straightenAction->setEnabled(inputFolderValid && outputFolderValid && m_image != 0 && m_processedView->position1() && m_processedView->position2());
-    m_straightenMoreAction->setEnabled(inputFolderValid && outputFolderValid && m_image != 0 && m_processedView->position1() && m_processedView->position2() && m_findCentreLine.polyA().size() && m_findCentreLine.polyB().size() && m_findCentreLine.centreLine().size());
-    m_firstImage->setEnabled(inputFolderValid && outputFolderValid && m_imageFileList.size() > 0 && m_imageFileListIndex > 0);
-    m_previousImage->setEnabled(inputFolderValid && outputFolderValid && m_imageFileList.size() > 0 && m_imageFileListIndex > 0);
-    m_nextImage->setEnabled(inputFolderValid && outputFolderValid && m_imageFileList.size() > 0 && m_imageFileListIndex < m_imageFileList.size() - 1);
-    m_lastImage->setEnabled(inputFolderValid && outputFolderValid && m_imageFileList.size() > 0 && m_imageFileListIndex < m_imageFileList.size() - 1);
+    bool outputImageFolderValid = outputImageFolderInfo.isDir() && outputImageFolderInfo.isReadable() && outputImageFolderInfo.isWritable();
+    bool outputMeshFolderValid = outputMeshFolderInfo.isDir() && outputMeshFolderInfo.isReadable() && outputMeshFolderInfo.isWritable();
+    m_straightenAction->setEnabled(inputFolderValid && outputImageFolderValid && outputMeshFolderValid && m_image != 0 && m_processedView->position1() && m_processedView->position2());
+    m_straightenMoreAction->setEnabled(inputFolderValid && outputImageFolderValid && outputMeshFolderValid && m_image != 0 && m_processedView->position1() && m_processedView->position2() && m_findCentreLine.polyA().size() && m_findCentreLine.polyB().size() && m_findCentreLine.centreLine().size());
+    m_firstImage->setEnabled(inputFolderValid && outputImageFolderValid && outputMeshFolderValid && m_imageFileList.size() > 0 && m_imageFileListIndex > 0);
+    m_previousImage->setEnabled(inputFolderValid && outputImageFolderValid && outputMeshFolderValid && m_imageFileList.size() > 0 && m_imageFileListIndex > 0);
+    m_nextImage->setEnabled(inputFolderValid && outputImageFolderValid && outputMeshFolderValid && m_imageFileList.size() > 0 && m_imageFileListIndex < m_imageFileList.size() - 1);
+    m_lastImage->setEnabled(inputFolderValid && outputImageFolderValid && outputMeshFolderValid && m_imageFileList.size() > 0 && m_imageFileListIndex < m_imageFileList.size() - 1);
 }
 
 void MainWindow::readSettings()
@@ -310,7 +313,7 @@ void MainWindow::readSettings()
     m_splitter->restoreState(settings.value("splitterState").toByteArray());
     m_sidebar->pathEditWidget("framesFolder")->setPath(settings.value("framesFolder", "").toString());
     m_sidebar->pathEditWidget("masksFolder")->setPath(settings.value("masksFolder", "").toString());
-    m_sidebar->pathEditWidget("outputFolder")->setPath(settings.value("outputFolder", "").toString());
+    m_sidebar->pathEditWidget("outputImageFolder")->setPath(settings.value("outputImageFolder", "").toString());
     m_sidebar->spinBox("threshold")->setValue(settings.value("threshold", "127").toInt());
     m_sidebar->checkBox("invert")->setChecked(settings.value("invert", "0").toBool());
 }
@@ -320,7 +323,7 @@ void MainWindow::writeSettings()
     QSettings settings(QSettings::IniFormat, QSettings::UserScope, "AnimalSimulationLaboratory", "Unbender");
     settings.setValue("framesFolder", m_sidebar->pathEditWidget("framesFolder")->path());
     settings.setValue("masksFolder", m_sidebar->pathEditWidget("masksFolder")->path());
-    settings.setValue("outputFolder", m_sidebar->pathEditWidget("outputFolder")->path());
+    settings.setValue("outputImageFolder", m_sidebar->pathEditWidget("outputImageFolder")->path());
     settings.setValue("threshold", m_sidebar->spinBox("threshold")->value());
     settings.setValue("invert", m_sidebar->checkBox("invert")->isChecked());
     settings.setValue("splitterState", m_splitter->saveState());
