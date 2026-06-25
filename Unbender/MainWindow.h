@@ -52,7 +52,7 @@ private:
     Sidebar *m_sidebar;
     FourPaneViewport *m_fourPaneViewport;
 
-    GraphicsView *m_originalView = 0;
+    GraphicsView *m_frameView = 0;
     GraphicsView *m_maskView = 0;
     GraphicsView *m_processedView = 0;
     MeshViewWidget* m_meshView = 0;
@@ -67,15 +67,17 @@ private:
 
     struct ImageSet
     {
-        std::unique_ptr<QImage> originalImage;
-        std::unique_ptr<QImage> maskImage;
-        std::unique_ptr<QImage> outputImage;
-        const std::vector<OpenCVTools::Mesh> outputMesh;
+        QImage frameImage;
+        QImage maskImage;
+        QImage outputImage;
+        OpenCVTools::Mesh outputMesh;
+        QString frameImagePath;
+        QString maskImagePath;
+        QString outputImagePath;
+        QString outputMeshPath;
     };
-    QStringList m_imageFileList;
+    QList<std::unique_ptr<ImageSet>> m_imageSetList;
     int m_imageFileListIndex = -1;
-    QString m_imageFileMatchRegex = "^.*\\.png$";
-    std::unique_ptr<ImageSet> m_imageSet;
     bool m_unsavedChanges = false;
     bool m_framesFolderValid = false;
     bool m_masksFolderValid = false;
