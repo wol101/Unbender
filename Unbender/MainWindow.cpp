@@ -161,9 +161,10 @@ void MainWindow::closeEvent(QCloseEvent *event)
     }
 }
 
-void MainWindow::openImage(const QString &filePath)
+void MainWindow::openImage()
 {
-    QImageReader reader(filePath);
+    m_imageSet = std::make_unique<ImageSet>();
+    QImageReader reader(m_imageFileList[m_imageFileListIndex]);
     reader.setAutoTransform(true);
     QImage image = reader.read();
 
@@ -180,21 +181,21 @@ void MainWindow::openImage(const QString &filePath)
         case QImage::Format_Grayscale8:
         case QImage::Format_RGB888:
         case QImage::Format_RGBA8888:
-            m_image = std::make_unique<QImage>(image);
+            m_imageSet->originalImage = std::make_unique<QImage>(image);
             break;
         // these formats need to be converted
         case QImage::QImage::Format_Grayscale16:
-            m_image = std::make_unique<QImage>(image.convertToFormat(QImage::Format_Grayscale8));
+            m_imageSet->originalImage = std::make_unique<QImage>(image.convertToFormat(QImage::Format_Grayscale8));
             break;
         case QImage::QImage::Format_RGB32:
-            m_image = std::make_unique<QImage>(image.convertToFormat(QImage::Format_RGB888));
+            m_imageSet->originalImage = std::make_unique<QImage>(image.convertToFormat(QImage::Format_RGB888));
             break;
         case QImage::QImage::Format_ARGB32:
-            m_image = std::make_unique<QImage>(image.convertToFormat(QImage::Format_RGBA8888));
+            m_imageSet->originalImage = std::make_unique<QImage>(image.convertToFormat(QImage::Format_RGBA8888));
             break;
         // everything else to Format_RGB888
         default:
-            m_image = std::make_unique<QImage>(image.convertToFormat(QImage::Format_RGB888));
+            m_imageSet->originalImage = std::make_unique<QImage>(image.convertToFormat(QImage::Format_RGB888));
             break;
         }
 
@@ -210,7 +211,7 @@ void MainWindow::saveDocument()
 void MainWindow::straighten()
 {
     m_findCentreLine.setThresholdValue(m_sidebar->spinBox("threshold")->value());
-    m_findCentreLine.setImg(OpenCVTools::convertQImageToMat(*m_image));
+    m_findCentreLine.setImg(OpenCVTools::convertQImageToMat(*m_imageSet->originalImage));
 
     MarkerItem *p1 = m_processedView->position1();
     m_findCentreLine.setUserPoint1(cv::Point2f(p1->pos().x(), p1->pos().y()));
@@ -219,8 +220,8 @@ void MainWindow::straighten()
 
     m_findCentreLine.straighten();
 
-    QImage thresholdImage = OpenCVTools::convertMatToQImage(m_findCentreLine.thresh());
-    m_processedView->setImage(new QGraphicsPixmapItem(QPixmap::fromImage(thresholdImage)));
+    *m_imageSet->maskImage = OpenCVTools::convertMatToQImage(m_findCentreLine.thresh());
+    m_processedView->setImage(new QGraphicsPixmapItem(QPixmap::fromImage(*m_imageSet->maskImage)));
 
     QGraphicsPathItem *item;
     item = new QGraphicsPathItem(OpenCVTools::convertPolylineToQPainterPath(m_findCentreLine.polyA(), false));
@@ -291,18 +292,28 @@ void MainWindow::straightenMore()
 
 void MainWindow::updateUI()
 {
-    QFileInfo inputFolderInfo(m_sidebar->pathEditWidget("masksFolder")->path());
+    QFileInfo framesFolderInfo(m_sidebar->pathEditWidget("framesFolder")->path());
+    QFileInfo masksFolderInfo(m_sidebar->pathEditWidget("masksFolder")->path());
     QFileInfo outputImageFolderInfo(m_sidebar->pathEditWidget("outputImageFolder")->path());
     QFileInfo outputMeshFolderInfo(m_sidebar->pathEditWidget("outputMeshFolder")->path());
-    bool inputFolderValid = inputFolderInfo.isDir() && inputFolderInfo.isReadable();
-    bool outputImageFolderValid = outputImageFolderInfo.isDir() && outputImageFolderInfo.isReadable() && outputImageFolderInfo.isWritable();
-    bool outputMeshFolderValid = outputMeshFolderInfo.isDir() && outputMeshFolderInfo.isReadable() && outputMeshFolderInfo.isWritable();
-    m_straightenAction->setEnabled(inputFolderValid && outputImageFolderValid && outputMeshFolderValid && m_image != 0 && m_processedView->position1() && m_processedView->position2());
-    m_straightenMoreAction->setEnabled(inputFolderValid && outputImageFolderValid && outputMeshFolderValid && m_image != 0 && m_processedView->position1() && m_processedView->position2() && m_findCentreLine.polyA().size() && m_findCentreLine.polyB().size() && m_findCentreLine.centreLine().size());
-    m_firstImage->setEnabled(inputFolderValid && outputImageFolderValid && outputMeshFolderValid && m_imageFileList.size() > 0 && m_imageFileListIndex > 0);
-    m_previousImage->setEnabled(inputFolderValid && outputImageFolderValid && outputMeshFolderValid && m_imageFileList.size() > 0 && m_imageFileListIndex > 0);
-    m_nextImage->setEnabled(inputFolderValid && outputImageFolderValid && outputMeshFolderValid && m_imageFileList.size() > 0 && m_imageFileListIndex < m_imageFileList.size() - 1);
-    m_lastImage->setEnabled(inputFolderValid && outputImageFolderValid && outputMeshFolderValid && m_imageFileList.size() > 0 && m_imageFileListIndex < m_imageFileList.size() - 1);
+    m_framesFolderValid = framesFolderInfo.isDir() && framesFolderInfo.isReadable();
+    m_masksFolderValid = masksFolderInfo.isDir() && masksFolderInfo.isReadable() && masksFolderInfo.isWritable();
+    m_outputImageFolderValid = outputImageFolderInfo.isDir() && outputImageFolderInfo.isReadable() && outputImageFolderInfo.isWritable();
+    m_outputMeshFolderValid = outputMeshFolderInfo.isDir() && outputMeshFolderInfo.isReadable() && outputMeshFolderInfo.isWritable();
+    m_straightenAction->setEnabled(m_framesFolderValid && m_masksFolderValid && m_outputImageFolderValid && m_outputMeshFolderValid &&
+                                   m_imageSet->originalImage != 0 && m_imageSet->maskImage != 0 &&
+                                   m_processedView->position1() && m_processedView->position2());
+    m_straightenMoreAction->setEnabled(m_framesFolderValid && m_masksFolderValid && m_outputImageFolderValid && m_outputMeshFolderValid &&
+                                       m_imageSet->originalImage != 0 && m_imageSet->maskImage != 0 && m_imageSet->outputImage &&
+                                       m_processedView->position1() && m_processedView->position2());
+    m_firstImage->setEnabled(m_framesFolderValid && m_masksFolderValid && m_outputImageFolderValid && m_outputMeshFolderValid &&
+                             m_imageFileList.size() > 0 && m_imageFileListIndex > 0);
+    m_previousImage->setEnabled(m_framesFolderValid && m_masksFolderValid && m_outputImageFolderValid && m_outputMeshFolderValid &&
+                                m_imageFileList.size() > 0 && m_imageFileListIndex > 0);
+    m_nextImage->setEnabled(m_framesFolderValid && m_masksFolderValid && m_outputImageFolderValid && m_outputMeshFolderValid &&
+                            m_imageFileList.size() > 0 && m_imageFileListIndex < m_imageFileList.size() - 1);
+    m_lastImage->setEnabled(m_framesFolderValid && m_masksFolderValid && m_outputImageFolderValid && m_outputMeshFolderValid &&
+                            m_imageFileList.size() > 0 && m_imageFileListIndex < m_imageFileList.size() - 1);
 }
 
 void MainWindow::readSettings()
@@ -360,7 +371,10 @@ void MainWindow::firstImage()
         return;
     }
     m_imageFileListIndex = 0;
-    openImage(m_imageFileList[m_imageFileListIndex]);
+    openImage();
+    if (m_imageSet->originalImage) thresholdImage();
+    if (m_imageSet->maskImage && m_processedView->position1() && m_processedView->position2()) straighten();
+    if (m_imageSet->outputImage) createMesh();
 }
 
 void MainWindow::lastImage()
@@ -371,7 +385,10 @@ void MainWindow::lastImage()
         return;
     }
     m_imageFileListIndex = m_imageFileList.size() - 1;
-    openImage(m_imageFileList[m_imageFileListIndex]);
+    openImage();
+    if (m_imageSet->originalImage) thresholdImage();
+    if (m_imageSet->maskImage && m_processedView->position1() && m_processedView->position2()) straighten();
+    if (m_imageSet->outputImage) createMesh();
 }
 
 void MainWindow::nextImage()
@@ -383,7 +400,10 @@ void MainWindow::nextImage()
     }
     ++m_imageFileListIndex;
     if (m_imageFileListIndex >= m_imageFileList.size()) m_imageFileListIndex = m_imageFileList.size() - 1;
-    openImage(m_imageFileList[m_imageFileListIndex]);
+    openImage();
+    if (m_imageSet->originalImage) thresholdImage();
+    if (m_imageSet->maskImage && m_processedView->position1() && m_processedView->position2()) straighten();
+    if (m_imageSet->outputImage) createMesh();
 }
 
 void MainWindow::previousImage()
@@ -395,5 +415,8 @@ void MainWindow::previousImage()
     }
     --m_imageFileListIndex;
     if (m_imageFileListIndex < 0) m_imageFileListIndex = 0;
-    openImage(m_imageFileList[m_imageFileListIndex]);
+    openImage();
+    if (m_imageSet->originalImage) thresholdImage();
+    if (m_imageSet->maskImage && m_processedView->position1() && m_processedView->position2()) straighten();
+    if (m_imageSet->outputImage) createMesh();
 }

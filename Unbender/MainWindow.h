@@ -75,12 +75,18 @@ private:
     QStringList m_imageFileList;
     int m_imageFileListIndex = -1;
     QString m_imageFileMatchRegex = "^.*\\.png$";
-    ImageSet m_imageSet;
+    std::unique_ptr<ImageSet> m_imageSet;
     bool m_unsavedChanges = false;
+    bool m_framesFolderValid = false;
+    bool m_masksFolderValid = false;
+    bool m_outputImageFolderValid = false;
+    bool m_outputMeshFolderValid = false;
 
     void readSettings();
     void writeSettings();
-    void openImage(const QString &filePath);
+    void openImage();
+    void thresholdImage();
+    void createMesh();
 
     FindCentreLine m_findCentreLine;
 
