@@ -40,6 +40,14 @@ public:
         std::string codecUsed;
     };
 
+    enum class ObjError
+    {
+        OK              = 0,
+        FILE_NOT_FOUND  = 1,
+        MALFORMED_DATA  = 2,
+        INDEX_OUT_OF_RANGE = 3,
+    };
+
     static cv::Mat convertQImageToMat(const QImage &img);
 
     static QImage convertMatToQImage(const cv::Mat &mat);
@@ -91,6 +99,12 @@ public:
     static bool subtractBackground(const std::string& inputPath, const std::string& outputPath);
 
     static OpenCVTools::WriterResult openWithFallback(cv::VideoWriter& writer, std::string outputPath, double fps, cv::Size size, bool isColor);
+
+    static OpenCVTools::ObjError loadObj(const std::string& path, Mesh& mesh);
+
+private:
+    static bool resolveIndex(int raw, int poolSize, int& out);
+    static bool parseFaceVertex(const std::string& token, int& v, int& t, int& n);
 
 };
 

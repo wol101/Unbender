@@ -349,7 +349,7 @@ void MainWindow::writeSettings()
 
 void MainWindow::updateFileList()
 {
-    m_imageFileList.clear();
+    m_imageSetList.clear();
     m_imageFileListIndex = -1;
     if (!m_framesFolderValid || !m_masksFolderValid || !m_outputImageFolderValid || !m_outputMeshFolderValid) return;
 
@@ -364,19 +364,74 @@ void MainWindow::updateFileList()
     {
         if (re.match(file).hasMatch()) // only .png files
         {
-            std::unique_ptr<ImageSetNames> imageSetNames = std::make_unique<ImageSetNames>();
-            QString maskPath = masksFolder.absoluteFilePath(file);
-            if (QFile::exists(maskPath)) imageSetNames->maskImage = std::make_unique<QString>(maskPath);
-            else continue;
-            QString framePath = framesFolder.absoluteFilePath(file);
-            if (QFile::exists(framePath)) imageSetNames->frameImage = std::make_unique<QString>(framePath);
-            QString outputImagePath = outputImageFolder.absoluteFilePath(file);
-            if (QFile::exists(outputImagePath)) imageSetNames->outputImage = std::make_unique<QString>(outputImagePath);
-            QString outputMeshPath = outputMeshFolder.absoluteFilePath(file.replace(".png", ".obj", Qt::CaseInsensitive));
-            if (QFile::exists(outputMeshPath)) imageSetNames->outputMesh = std::make_unique<QString>(outputMeshPath);
+            ImageSet imageSet;
+            // there must always be a mask
+            QString path = masksFolder.absoluteFilePath(file);
+            QImage image = readImageEndednessIndependent(path);
+            if (image.isNull()) continue;
+            imageSet.maskImagePath = path;
+            imageSet.maskImage = image;
+            // but the others might not exist yet
+            path = framesFolder.absoluteFilePath(file);
+            image = readImageEndednessIndependent(path);
+            if (!image.isNull())
+            {
+                imageSet.frameImagePath = path;
+                imageSet.frameImage = image;
+            }
+            path = outputImageFolder.absoluteFilePath(file);
+            image = readImageEndednessIndependent(path);
+            if (!image.isNull())
+            {
+                imageSet.outputImagePath = path;
+                imageSet.outputImage = image;
+            }
+            path = outputMeshFolder.absoluteFilePath(file.replace(".png", ".obj", Qt::CaseInsensitive));
+            image = readImageEndednessIndependent(path);
+            if (!image.isNull())
+            {
+                imageSet.outputMeshPath = path;
+                imageSet.outputMesh = mesh;
+            }
         }
     }
 }
+
+QImage MainWindow::readImageEndednessIndependent(const QString &imagePath)
+{
+    QImageReader reader(imagePath);
+    reader.setAutoTransform(true);
+    QImage image = reader.read();
+
+    if (!image.isNull())
+    {
+        // I want to stadardise on the endedness independent QImage formats
+        switch (image.format())
+        {
+        // these formats are used unchanged because they are endian indepenndent
+        case QImage::Format_Grayscale8:
+        case QImage::Format_RGB888:
+        case QImage::Format_RGBA8888:
+            return image;
+            break;
+        // these formats need to be converted
+        case QImage::QImage::Format_Grayscale16:
+            return image.convertToFormat(QImage::Format_Grayscale8);
+            break;
+        case QImage::QImage::Format_RGB32:
+            return image.convertToFormat(QImage::Format_RGB888);
+            break;
+        case QImage::QImage::Format_ARGB32:
+            return image.convertToFormat(QImage::Format_RGBA8888);
+            break;
+        // everything else to Format_RGB888
+        default:
+            return image.convertToFormat(QImage::Format_RGB888);
+            break;
+        }
+    }
+}
+
 
 void MainWindow::firstImage()
 {

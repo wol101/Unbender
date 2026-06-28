@@ -89,6 +89,7 @@ private:
     void openImage();
     void thresholdImage();
     void createMesh();
+    static QImage readImageEndednessIndependent(const QString &imagePath);
 
     FindCentreLine m_findCentreLine;
 

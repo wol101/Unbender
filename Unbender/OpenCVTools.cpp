@@ -6,6 +6,10 @@
 
 #include <sstream>
 #include <filesystem>
+#include <fstream>
+#include <string>
+#include <unordered_map>
+#include <vector>
 
 OpenCVTools::OpenCVTools() {}
 
@@ -990,7 +994,6 @@ OpenCVTools::Mesh OpenCVTools::revolvePolyline(const std::vector<cv::Point2f>& p
 // •    f → face (1 indexed, with v/vt/vn triplets)
 // It works even if UVs or normals are missing.
 
-
 std::string OpenCVTools::meshToOBJ(const OpenCVTools::Mesh& mesh, const std::string& objectName)
 {
     std::ostringstream out;
@@ -1162,3 +1165,154 @@ OpenCVTools::WriterResult OpenCVTools::openWithFallback(cv::VideoWriter& writer,
     return result;
 }
 
+// Resolve a 1-based (positive) or negative (relative) OBJ index into a
+// 0-based index into a pool of the given size.  Returns false on failure.
+bool OpenCVTools::resolveIndex(int raw, int poolSize, int& out)
+{
+    if (raw == 0) return false;
+    int idx = (raw > 0) ? raw - 1 : poolSize + raw;
+    if (idx < 0 || idx >= poolSize) return false;
+    out = idx;
+    return true;
+}
+
+// Split "v", "v/t", "v//n", or "v/t/n" into component raw OBJ indices.
+// Missing components are left as 0.
+bool OpenCVTools::parseFaceVertex(const std::string& token, int& v, int& t, int& n)
+{
+    v = t = n = 0;
+    std::istringstream ss(token);
+    std::string part;
+
+    // position
+    if (!std::getline(ss, part, '/')) return false;
+    if (part.empty()) return false;
+    try { v = std::stoi(part); } catch (...) { return false; }
+
+    if (ss.eof()) return true;
+
+    // uv (may be empty for "v//n")
+    std::getline(ss, part, '/');
+    if (!part.empty())
+    {
+        try { t = std::stoi(part); } catch (...) { return false; }
+    }
+
+    if (ss.eof()) return true;
+
+    // normal
+    std::getline(ss, part);
+    if (!part.empty())
+    {
+        try { n = std::stoi(part); } catch (...) { return false; }
+    }
+    return true;
+}
+
+OpenCVTools::ObjError OpenCVTools::loadObj(const std::string& path, Mesh& mesh)
+{
+    std::ifstream file(path);
+    if (!file.is_open())
+        return ObjError::FILE_NOT_FOUND;
+
+    mesh = {};
+
+    // Raw OBJ pools (all 0-based after parsing, still per-attribute).
+    std::vector<cv::Point3f> objV, objN;
+    std::vector<cv::Point2f> objT;
+
+    // Map (vIdx, tIdx, nIdx) → unified output vertex index.
+    // We use -1 to mean "absent" for t and n.
+    using Key = std::tuple<int,int,int>;
+    struct KeyHash {
+        size_t operator()(const Key& k) const {
+            size_t h = std::hash<int>{}(std::get<0>(k));
+            h ^= std::hash<int>{}(std::get<1>(k)) + 0x9e3779b9 + (h<<6) + (h>>2);
+            h ^= std::hash<int>{}(std::get<2>(k)) + 0x9e3779b9 + (h<<6) + (h>>2);
+            return h;
+        }
+    };
+    std::unordered_map<Key, int, KeyHash> vertexCache;
+
+    // Per-face polygon corners before fan-triangulation.
+    std::vector<int> faceCorners;
+
+    std::string line;
+    int lineNum = 0;
+
+    while (std::getline(file, line))
+    {
+        ++lineNum;
+
+        // Strip comments and leading/trailing whitespace.
+        auto commentPos = line.find('#');
+        if (commentPos != std::string::npos)
+            line.erase(commentPos);
+
+        std::istringstream ss(line);
+        std::string keyword;
+        if (!(ss >> keyword) || keyword.empty())
+            continue;
+
+        if (keyword == "v")
+        {
+            float x, y, z;
+            if (!(ss >> x >> y >> z))
+                return ObjError::MALFORMED_DATA;
+            objV.push_back({x, y, z});
+        }
+        else if (keyword == "vn")
+        {
+            float x, y, z;
+            if (!(ss >> x >> y >> z))
+                return ObjError::MALFORMED_DATA;
+            objN.push_back({x, y, z});
+        }
+        else if (keyword == "vt")
+        {
+            float u, v;
+            if (!(ss >> u >> v))
+                return ObjError::MALFORMED_DATA;
+            objT.push_back({u, v});
+        }
+        else if (keyword == "f")
+        {
+            faceCorners.clear();
+            std::string token;
+
+            while (ss >> token)
+            {
+                int rawV, rawT, rawN;
+                if (!parseFaceVertex(token, rawV, rawT, rawN))
+                    return ObjError::MALFORMED_DATA;
+
+                int vi, ti = -1, ni = -1;
+                if (!resolveIndex(rawV, static_cast<int>(objV.size()), vi))
+                    return ObjError::INDEX_OUT_OF_RANGE;
+                if (rawT != 0 && !resolveIndex(rawT, static_cast<int>(objT.size()), ti))
+                    return ObjError::INDEX_OUT_OF_RANGE;
+                if (rawN != 0 && !resolveIndex(rawN, static_cast<int>(objN.size()), ni))
+                    return ObjError::INDEX_OUT_OF_RANGE;
+
+                Key key{vi, ti, ni};
+                auto [it, inserted] = vertexCache.emplace(key, static_cast<int>(mesh.vertices.size()));
+                if (inserted)
+                {
+                    mesh.vertices.push_back(objV[vi]);
+                    mesh.normals.push_back(ni >= 0 ? objN[ni] : cv::Point3f{0, 0, 0});
+                    mesh.uvs.push_back(ti >= 0 ? objT[ti] : cv::Point2f{0, 0});
+                }
+                faceCorners.push_back(it->second);
+            }
+
+            // Fan-triangulate (works for convex polygons; sufficient for most OBJ).
+            if (faceCorners.size() < 3)
+                return ObjError::MALFORMED_DATA;
+            for (size_t i = 1; i + 1 < faceCorners.size(); ++i)
+                mesh.triangles.push_back({faceCorners[0], faceCorners[i], faceCorners[i + 1]});
+        }
+        // Silently ignore: mtllib, usemtl, o, g, s, l, etc.
+    }
+
+    return ObjError::OK;
+}
