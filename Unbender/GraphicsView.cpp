@@ -228,6 +228,26 @@ void GraphicsView::setOutline(QGraphicsPathItem *pathItem)
     }
 }
 
+QImage GraphicsView::renderSceneToImage()
+{
+    // Get the pixmap's rect in scene coordinates
+    QRectF clipRect = m_image->mapToScene(m_image->boundingRect()).boundingRect();
+
+    // Create a QImage at the pixmap's native resolution
+    QSize imageSize = m_image->pixmap().size();
+    QImage image(imageSize, QImage::Format_RGBA8888);
+    image.fill(Qt::transparent);
+
+    // Paint the scene onto the image, mapped to the pixmap rect
+    QPainter painter(&image);
+    painter.setRenderHint(QPainter::Antialiasing);
+    scene()->render(&painter,
+                  QRectF(QPointF(0, 0), imageSize),  // target: full image
+                  clipRect);                         // source: pixmap bounds in scene
+
+    return image;
+}
+
 MarkerItem *GraphicsView::position2() const
 {
     return m_position2;

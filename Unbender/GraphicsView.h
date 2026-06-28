@@ -25,6 +25,8 @@ public:
 
     void setOutline(QGraphicsPathItem *outline);
 
+    QImage renderSceneToImage();
+
     MarkerItem *cursor() const;
 
     MarkerItem *position1() const;

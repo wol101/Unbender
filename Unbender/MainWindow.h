@@ -75,9 +75,12 @@ private:
         QString maskImagePath;
         QString outputImagePath;
         QString outputMeshPath;
+        cv::Point2f pStart;
+        cv::Point2f pEnd;
+        bool recalculate = false;
     };
-    QList<std::unique_ptr<ImageSet>> m_imageSetList;
-    int m_imageFileListIndex = -1;
+    std::vector<std::unique_ptr<ImageSet>> m_imageSetList;
+    int m_imageSetListIndex = -1;
     bool m_unsavedChanges = false;
     bool m_framesFolderValid = false;
     bool m_masksFolderValid = false;
@@ -90,8 +93,10 @@ private:
     void thresholdImage();
     void createMesh();
     static QImage readImageEndednessIndependent(const QString &imagePath);
+    void processCurrentImage();
 
     FindCentreLine m_findCentreLine;
+    size_t m_straightenMoreCount = 0;
 
 };
 #endif // MAINWINDOW_H

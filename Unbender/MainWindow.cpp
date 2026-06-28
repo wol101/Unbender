@@ -163,42 +163,42 @@ void MainWindow::closeEvent(QCloseEvent *event)
 
 void MainWindow::openImage()
 {
-    m_imageSet = std::make_unique<ImageSet>();
-    QImageReader reader(m_imageFileList[m_imageFileListIndex]);
-    reader.setAutoTransform(true);
-    QImage image = reader.read();
+    // imageSet = std::make_unique<ImageSet>();
+    // QImageReader reader(m_imageSetList[m_imageSetListIndex]);
+    // reader.setAutoTransform(true);
+    // QImage image = reader.read();
 
-    if (!image.isNull())
-    {
-        QGraphicsPixmapItem *item = new QGraphicsPixmapItem(QPixmap::fromImage(image));
-        m_processedView->clear();
-        m_processedView->setImage(item);
-        // m_processedView->fitInView(m_processedView->scene()->itemsBoundingRect(), Qt::KeepAspectRatio);
-        // I want to stadardise on the endedness independent QImage formats
-        switch (image.format())
-        {
-        // these formats are used unchanged because they are endian indepenndent
-        case QImage::Format_Grayscale8:
-        case QImage::Format_RGB888:
-        case QImage::Format_RGBA8888:
-            m_imageSet->frameImage = std::make_unique<QImage>(image);
-            break;
-        // these formats need to be converted
-        case QImage::QImage::Format_Grayscale16:
-            m_imageSet->frameImage = std::make_unique<QImage>(image.convertToFormat(QImage::Format_Grayscale8));
-            break;
-        case QImage::QImage::Format_RGB32:
-            m_imageSet->frameImage = std::make_unique<QImage>(image.convertToFormat(QImage::Format_RGB888));
-            break;
-        case QImage::QImage::Format_ARGB32:
-            m_imageSet->frameImage = std::make_unique<QImage>(image.convertToFormat(QImage::Format_RGBA8888));
-            break;
-        // everything else to Format_RGB888
-        default:
-            m_imageSet->frameImage = std::make_unique<QImage>(image.convertToFormat(QImage::Format_RGB888));
-            break;
-        }
-    }
+    // if (!image.isNull())
+    // {
+    //     QGraphicsPixmapItem *item = new QGraphicsPixmapItem(QPixmap::fromImage(image));
+    //     m_processedView->clear();
+    //     m_processedView->setImage(item);
+    //     // m_processedView->fitInView(m_processedView->scene()->itemsBoundingRect(), Qt::KeepAspectRatio);
+    //     // I want to stadardise on the endedness independent QImage formats
+    //     switch (image.format())
+    //     {
+    //     // these formats are used unchanged because they are endian indepenndent
+    //     case QImage::Format_Grayscale8:
+    //     case QImage::Format_RGB888:
+    //     case QImage::Format_RGBA8888:
+    //         imageSet->frameImage = std::make_unique<QImage>(image);
+    //         break;
+    //     // these formats need to be converted
+    //     case QImage::QImage::Format_Grayscale16:
+    //         imageSet->frameImage = std::make_unique<QImage>(image.convertToFormat(QImage::Format_Grayscale8));
+    //         break;
+    //     case QImage::QImage::Format_RGB32:
+    //         imageSet->frameImage = std::make_unique<QImage>(image.convertToFormat(QImage::Format_RGB888));
+    //         break;
+    //     case QImage::QImage::Format_ARGB32:
+    //         imageSet->frameImage = std::make_unique<QImage>(image.convertToFormat(QImage::Format_RGBA8888));
+    //         break;
+    //     // everything else to Format_RGB888
+    //     default:
+    //         imageSet->frameImage = std::make_unique<QImage>(image.convertToFormat(QImage::Format_RGB888));
+    //         break;
+    //     }
+    // }
 
 
     updateUI();
@@ -212,8 +212,9 @@ void MainWindow::saveDocument()
 
 void MainWindow::straighten()
 {
+    const ImageSet *imageSet = m_imageSetList[m_imageSetListIndex].get();
     m_findCentreLine.setThresholdValue(m_sidebar->spinBox("threshold")->value());
-    m_findCentreLine.setImg(OpenCVTools::convertQImageToMat(*m_imageSet->frameImage));
+    m_findCentreLine.setImg(OpenCVTools::convertQImageToMat(imageSet->frameImage));
 
     MarkerItem *p1 = m_processedView->position1();
     m_findCentreLine.setUserPoint1(cv::Point2f(p1->pos().x(), p1->pos().y()));
@@ -222,8 +223,8 @@ void MainWindow::straighten()
 
     m_findCentreLine.straighten();
 
-    *m_imageSet->maskImage = OpenCVTools::convertMatToQImage(m_findCentreLine.thresh());
-    m_processedView->setImage(new QGraphicsPixmapItem(QPixmap::fromImage(*m_imageSet->maskImage)));
+    QImage thresholdImage = OpenCVTools::convertMatToQImage(m_findCentreLine.thresh());
+    m_processedView->setImage(new QGraphicsPixmapItem(QPixmap::fromImage(thresholdImage)));
 
     QGraphicsPathItem *item;
     item = new QGraphicsPathItem(OpenCVTools::convertPolylineToQPainterPath(m_findCentreLine.polyA(), false));
@@ -283,17 +284,13 @@ void MainWindow::straightenMore()
     m_processedView->addExtraItem(item);
 
     m_findCentreLine.createStraightVersion();
-    auto mesh = m_findCentreLine.straightMesh();
-    std::string objVersion = OpenCVTools::meshToOBJ(mesh, "straight_mesh");
-    std::ofstream("C:\\Scratch\\output.obj") << objVersion;
-    m_meshView->setMeshes({mesh});
-
     updateUI();
 }
 
 
 void MainWindow::updateUI()
 {
+    const ImageSet *imageSet = m_imageSetList[m_imageSetListIndex].get();
     QFileInfo framesFolderInfo(m_sidebar->pathEditWidget("framesFolder")->path());
     QFileInfo masksFolderInfo(m_sidebar->pathEditWidget("masksFolder")->path());
     QFileInfo outputImageFolderInfo(m_sidebar->pathEditWidget("outputImageFolder")->path());
@@ -303,19 +300,18 @@ void MainWindow::updateUI()
     m_outputImageFolderValid = outputImageFolderInfo.isDir() && outputImageFolderInfo.isReadable() && outputImageFolderInfo.isWritable();
     m_outputMeshFolderValid = outputMeshFolderInfo.isDir() && outputMeshFolderInfo.isReadable() && outputMeshFolderInfo.isWritable();
     m_straightenAction->setEnabled(m_framesFolderValid && m_masksFolderValid && m_outputImageFolderValid && m_outputMeshFolderValid &&
-                                   m_imageSet->frameImage != 0 && m_imageSet->maskImage != 0 &&
-                                   m_processedView->position1() && m_processedView->position2());
+                                   !imageSet->maskImage.isNull() &&  m_processedView->position1() && m_processedView->position2());
     m_straightenMoreAction->setEnabled(m_framesFolderValid && m_masksFolderValid && m_outputImageFolderValid && m_outputMeshFolderValid &&
-                                       m_imageSet->frameImage != 0 && m_imageSet->maskImage != 0 && m_imageSet->outputImage &&
+                                       !imageSet->maskImage.isNull() && !imageSet->outputImage.isNull() &&
                                        m_processedView->position1() && m_processedView->position2());
     m_firstImage->setEnabled(m_framesFolderValid && m_masksFolderValid && m_outputImageFolderValid && m_outputMeshFolderValid &&
-                             m_imageFileList.size() > 0 && m_imageFileListIndex > 0);
+                             m_imageSetList.size() > 0 && m_imageSetListIndex > 0);
     m_previousImage->setEnabled(m_framesFolderValid && m_masksFolderValid && m_outputImageFolderValid && m_outputMeshFolderValid &&
-                                m_imageFileList.size() > 0 && m_imageFileListIndex > 0);
+                                m_imageSetList.size() > 0 && m_imageSetListIndex > 0);
     m_nextImage->setEnabled(m_framesFolderValid && m_masksFolderValid && m_outputImageFolderValid && m_outputMeshFolderValid &&
-                            m_imageFileList.size() > 0 && m_imageFileListIndex < m_imageFileList.size() - 1);
+                            m_imageSetList.size() > 0 && m_imageSetListIndex < m_imageSetList.size() - 1);
     m_lastImage->setEnabled(m_framesFolderValid && m_masksFolderValid && m_outputImageFolderValid && m_outputMeshFolderValid &&
-                            m_imageFileList.size() > 0 && m_imageFileListIndex < m_imageFileList.size() - 1);
+                            m_imageSetList.size() > 0 && m_imageSetListIndex < m_imageSetList.size() - 1);
 }
 
 void MainWindow::readSettings()
@@ -350,7 +346,7 @@ void MainWindow::writeSettings()
 void MainWindow::updateFileList()
 {
     m_imageSetList.clear();
-    m_imageFileListIndex = -1;
+    m_imageSetListIndex = -1;
     if (!m_framesFolderValid || !m_masksFolderValid || !m_outputImageFolderValid || !m_outputMeshFolderValid) return;
 
     QDir framesFolder(m_sidebar->pathEditWidget("framesFolder")->path());
@@ -387,8 +383,9 @@ void MainWindow::updateFileList()
                 imageSet.outputImage = image;
             }
             path = outputMeshFolder.absoluteFilePath(file.replace(".png", ".obj", Qt::CaseInsensitive));
-            image = readImageEndednessIndependent(path);
-            if (!image.isNull())
+            OpenCVTools::Mesh mesh;
+            OpenCVTools::ObjError err = OpenCVTools::loadObj(path.toStdString(), mesh);
+            if (err == OpenCVTools::ObjError::OK)
             {
                 imageSet.outputMeshPath = path;
                 imageSet.outputMesh = mesh;
@@ -430,63 +427,89 @@ QImage MainWindow::readImageEndednessIndependent(const QString &imagePath)
             break;
         }
     }
+    return image;
 }
 
+void MainWindow::processCurrentImage()
+{
+    ImageSet *imageSet = m_imageSetList[m_imageSetListIndex].get();
+    if (!imageSet)
+    {
+        qDebug() << "Warning: null image set in MainWindow::processCurrentImage()";
+        return;
+    }
+    // simply display the original frame if it exists
+    if (!imageSet->frameImage.isNull()) { m_frameView->setImage(new QGraphicsPixmapItem(QPixmap::fromImage(imageSet->frameImage))); }
+    // there has to be a mask view to process so check here
+    if (!imageSet->maskImage.isNull()) { m_maskView->setImage(new QGraphicsPixmapItem(QPixmap::fromImage(imageSet->maskImage))); }
+    else
+    {
+        qDebug() << "Warning: maskImage missing in MainWindow::processCurrentImage()";
+        return;
+    }
+    // has the outputImage already been calculated
+    if (!imageSet->outputImage.isNull()) { m_processedView->setImage(new QGraphicsPixmapItem(QPixmap::fromImage(imageSet->outputImage))); }
+    else
+    {
+        straighten();
+        for (size_t i = 0; i < m_straightenMoreCount; ++i) straightenMore();
+        QDir outputImageFolder(m_sidebar->pathEditWidget("outputImageFolder")->path());
+        QFileInfo fileInfo(imageSet->maskImagePath);
+        imageSet->outputImagePath = outputImageFolder.absoluteFilePath(fileInfo.fileName());
+        imageSet->outputImage = m_processedView->renderSceneToImage();
+        imageSet->outputImage.save(imageSet->outputImagePath);
+
+        QDir outputMeshFolder(m_sidebar->pathEditWidget("outputMeshFolder")->path());
+        imageSet->outputMeshPath = outputMeshFolder.absoluteFilePath(fileInfo.fileName().replace(".png", ".obj", Qt::CaseInsensitive));
+        auto mesh = m_findCentreLine.straightMesh();
+        std::string objVersion = OpenCVTools::meshToOBJ(mesh, "straight_mesh");
+        std::ofstream(imageSet->outputMeshPath.toStdString()) << objVersion;
+        m_meshView->setMeshes({mesh});
+    }
+}
 
 void MainWindow::firstImage()
 {
-    if (m_imageFileList.size() == 0)
+    if (m_imageSetList.size() == 0)
     {
-        m_imageFileListIndex = -1;
+        m_imageSetListIndex = -1;
         return;
     }
-    m_imageFileListIndex = 0;
-    openImage();
-    if (m_imageSet->frameImage) thresholdImage();
-    if (m_imageSet->maskImage && m_processedView->position1() && m_processedView->position2()) straighten();
-    if (m_imageSet->outputImage) createMesh();
+    m_imageSetListIndex = 0;
+    processCurrentImage();
 }
 
 void MainWindow::lastImage()
 {
-    if (m_imageFileList.size() == 0)
+    if (m_imageSetList.size() == 0)
     {
-        m_imageFileListIndex = -1;
+        m_imageSetListIndex = -1;
         return;
     }
-    m_imageFileListIndex = m_imageFileList.size() - 1;
-    openImage();
-    if (m_imageSet->frameImage) thresholdImage();
-    if (m_imageSet->maskImage && m_processedView->position1() && m_processedView->position2()) straighten();
-    if (m_imageSet->outputImage) createMesh();
+    m_imageSetListIndex = m_imageSetList.size() - 1;
+    processCurrentImage();
 }
 
 void MainWindow::nextImage()
 {
-    if (m_imageFileList.size() == 0)
+    if (m_imageSetList.size() == 0)
     {
-        m_imageFileListIndex = -1;
+        m_imageSetListIndex = -1;
         return;
     }
-    ++m_imageFileListIndex;
-    if (m_imageFileListIndex >= m_imageFileList.size()) m_imageFileListIndex = m_imageFileList.size() - 1;
-    openImage();
-    if (m_imageSet->frameImage) thresholdImage();
-    if (m_imageSet->maskImage && m_processedView->position1() && m_processedView->position2()) straighten();
-    if (m_imageSet->outputImage) createMesh();
+    ++m_imageSetListIndex;
+    if (m_imageSetListIndex >= m_imageSetList.size()) m_imageSetListIndex = m_imageSetList.size() - 1;
+    processCurrentImage();
 }
 
 void MainWindow::previousImage()
 {
-    if (m_imageFileList.size() == 0)
+    if (m_imageSetList.size() == 0)
     {
-        m_imageFileListIndex = -1;
+        m_imageSetListIndex = -1;
         return;
     }
-    --m_imageFileListIndex;
-    if (m_imageFileListIndex < 0) m_imageFileListIndex = 0;
-    openImage();
-    if (m_imageSet->frameImage) thresholdImage();
-    if (m_imageSet->maskImage && m_processedView->position1() && m_processedView->position2()) straighten();
-    if (m_imageSet->outputImage) createMesh();
+    --m_imageSetListIndex;
+    if (m_imageSetListIndex < 0) m_imageSetListIndex = 0;
+    processCurrentImage();
 }
