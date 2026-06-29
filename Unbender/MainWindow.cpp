@@ -93,6 +93,9 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent) , m_ui(new Ui::Mai
     m_nextImage = new QAction(style()->standardIcon(QStyle::SP_MediaSeekForward), tr("Next Image"), this);
     m_previousImage = new QAction(style()->standardIcon(QStyle::SP_MediaSeekBackward), tr("Previous Images"), this);
 
+    m_nextImage->setShortcut(Qt::ALT | Qt::Key_Right);
+    m_previousImage->setShortcut(Qt::ALT | Qt::Key_Left);
+
     // Create toolbar
     auto *toolbar = addToolBar(tr("Main Toolbar"));
     toolbar->setObjectName("mainToolbar");  // useful for saving/restoring state
@@ -180,8 +183,10 @@ void MainWindow::straighten()
     MarkerItem *p1 = m_maskView->position1();
     MarkerItem *p2 = m_maskView->position2();
     if (!p1 || !p2) return;
-    m_findCentreLine->setUserPoint1(cv::Point2f(p1->pos().x(), p1->pos().y()));
-    m_findCentreLine->setUserPoint2(cv::Point2f(p2->pos().x(), p2->pos().y()));
+    imageSet->pStart = cv::Point2f(p1->pos().x(), p1->pos().y());
+    imageSet->pEnd = cv::Point2f(p2->pos().x(), p2->pos().y());
+    m_findCentreLine->setUserPoint1(imageSet->pStart);
+    m_findCentreLine->setUserPoint2(imageSet->pEnd);
 
     m_findCentreLine->straighten();
 
@@ -218,11 +223,21 @@ void MainWindow::straighten()
     imageSet->outputImage = m_processedView->renderSceneToImage();
     imageSet->outputImage.save(imageSet->outputImagePath);
 
+    // mesh is no longer valid
+    QDir outputMeshFolder(m_sidebar->pathEditWidget("outputMeshFolder")->path());
+    imageSet->outputMeshPath = outputMeshFolder.absoluteFilePath(replaceExtension(fileInfo.fileName(), ".obj"));
+    QFile::remove(imageSet->outputMeshPath);
+    imageSet->outputMeshPath = "";
+    imageSet->outputMesh = OpenCVTools::Mesh();
+    m_meshView->setMeshes({imageSet->outputMesh});
+
+    imageSet->findCentreLine = *m_findCentreLine;
     updateUI();
 }
 
 void MainWindow::straightenMore()
 {
+    ImageSet *imageSet = m_imageSetList[m_imageSetListIndex].get();
     if (!m_findCentreLine) return;
     m_findCentreLine->straightenMore();
 
@@ -253,6 +268,7 @@ void MainWindow::straightenMore()
     m_processedView->addExtraItem(item);
 
     m_findCentreLine->createStraightVersion();
+    imageSet->findCentreLine = *m_findCentreLine;
     updateUI();
 }
 
@@ -440,12 +456,18 @@ void MainWindow::processCurrentImage()
     // simply display the original frame if it exists
     if (!imageSet->frameImage.isNull()) { m_frameView->setImage(new QGraphicsPixmapItem(QPixmap::fromImage(imageSet->frameImage))); }
     // there has to be a mask view to process so check here
-    if (!imageSet->maskImage.isNull()) { m_maskView->setImage(new QGraphicsPixmapItem(QPixmap::fromImage(imageSet->maskImage))); }
+    if (!imageSet->maskImage.isNull())
+    {
+        setWindowTitle(QString("Unbender: ") + imageSet->maskImagePath);
+        m_maskView->setImage(new QGraphicsPixmapItem(QPixmap::fromImage(imageSet->maskImage)));
+    }
     else
     {
         qDebug() << "Warning: maskImage missing in MainWindow::processCurrentImage()";
         return;
     }
+    if (imageSet->pStart != cv::Point2f{-1.f, -1.f}) m_frameView->setPosition1(QPointF(imageSet->pStart.x, imageSet->pStart.x));
+    if (imageSet->pEnd != cv::Point2f{-1.f, -1.f}) m_frameView->setPosition2(QPointF(imageSet->pEnd.x, imageSet->pEnd.x));
     // has the outputImage already been calculated
     if (!imageSet->outputImage.isNull()) { m_processedView->setImage(new QGraphicsPixmapItem(QPixmap::fromImage(imageSet->outputImage))); }
     else

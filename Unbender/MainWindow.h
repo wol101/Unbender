@@ -79,7 +79,7 @@ private:
         QString outputMeshPath;
         cv::Point2f pStart = {-1.f, -1.f};
         cv::Point2f pEnd = {-1.f, -1.f};
-        bool recalculate = false;
+        FindCentreLine findCentreLine;
     };
     std::vector<std::unique_ptr<ImageSet>> m_imageSetList;
     int m_imageSetListIndex = -1;
