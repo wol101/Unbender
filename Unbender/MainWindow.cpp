@@ -162,50 +162,6 @@ void MainWindow::closeEvent(QCloseEvent *event)
     }
 }
 
-void MainWindow::openImage()
-{
-    // imageSet = std::make_unique<ImageSet>();
-    // QImageReader reader(m_imageSetList[m_imageSetListIndex]);
-    // reader.setAutoTransform(true);
-    // QImage image = reader.read();
-
-    // if (!image.isNull())
-    // {
-    //     QGraphicsPixmapItem *item = new QGraphicsPixmapItem(QPixmap::fromImage(image));
-    //     m_processedView->clear();
-    //     m_processedView->setImage(item);
-    //     // m_processedView->fitInView(m_processedView->scene()->itemsBoundingRect(), Qt::KeepAspectRatio);
-    //     // I want to stadardise on the endedness independent QImage formats
-    //     switch (image.format())
-    //     {
-    //     // these formats are used unchanged because they are endian indepenndent
-    //     case QImage::Format_Grayscale8:
-    //     case QImage::Format_RGB888:
-    //     case QImage::Format_RGBA8888:
-    //         imageSet->frameImage = std::make_unique<QImage>(image);
-    //         break;
-    //     // these formats need to be converted
-    //     case QImage::QImage::Format_Grayscale16:
-    //         imageSet->frameImage = std::make_unique<QImage>(image.convertToFormat(QImage::Format_Grayscale8));
-    //         break;
-    //     case QImage::QImage::Format_RGB32:
-    //         imageSet->frameImage = std::make_unique<QImage>(image.convertToFormat(QImage::Format_RGB888));
-    //         break;
-    //     case QImage::QImage::Format_ARGB32:
-    //         imageSet->frameImage = std::make_unique<QImage>(image.convertToFormat(QImage::Format_RGBA8888));
-    //         break;
-    //     // everything else to Format_RGB888
-    //     default:
-    //         imageSet->frameImage = std::make_unique<QImage>(image.convertToFormat(QImage::Format_RGB888));
-    //         break;
-    //     }
-    // }
-
-
-    updateUI();
-
-}
-
 void MainWindow::saveDocument()
 {
     updateUI();
@@ -213,32 +169,33 @@ void MainWindow::saveDocument()
 
 void MainWindow::straighten()
 {
-    const ImageSet *imageSet = m_imageSetList[m_imageSetListIndex].get();
-    m_findCentreLine.setThresholdValue(m_sidebar->spinBox("threshold")->value());
-    m_findCentreLine.setImg(OpenCVTools::convertQImageToMat(imageSet->frameImage));
+    ImageSet *imageSet = m_imageSetList[m_imageSetListIndex].get();
+    m_findCentreLine = std::make_unique<FindCentreLine>();
+    m_findCentreLine->setThresholdValue(m_sidebar->spinBox("threshold")->value());
+    m_findCentreLine->setImg(OpenCVTools::convertQImageToMat(imageSet->frameImage));
 
     MarkerItem *p1 = m_maskView->position1();
     MarkerItem *p2 = m_maskView->position2();
     if (!p1 || !p2) return;
-    m_findCentreLine.setUserPoint1(cv::Point2f(p1->pos().x(), p1->pos().y()));
-    m_findCentreLine.setUserPoint2(cv::Point2f(p2->pos().x(), p2->pos().y()));
+    m_findCentreLine->setUserPoint1(cv::Point2f(p1->pos().x(), p1->pos().y()));
+    m_findCentreLine->setUserPoint2(cv::Point2f(p2->pos().x(), p2->pos().y()));
 
-    m_findCentreLine.straighten();
+    m_findCentreLine->straighten();
 
-    QImage thresholdImage = OpenCVTools::convertMatToQImage(m_findCentreLine.thresh());
+    QImage thresholdImage = OpenCVTools::convertMatToQImage(m_findCentreLine->thresh());
     m_processedView->setImage(new QGraphicsPixmapItem(QPixmap::fromImage(thresholdImage)));
 
     QGraphicsPathItem *item;
-    item = new QGraphicsPathItem(OpenCVTools::convertPolylineToQPainterPath(m_findCentreLine.polyA(), false));
+    item = new QGraphicsPathItem(OpenCVTools::convertPolylineToQPainterPath(m_findCentreLine->polyA(), false));
     item->setPen(QPen(Qt::cyan, 2));
     item->setBrush(Qt::NoBrush);
     m_processedView->addExtraItem(item);
-    item = new QGraphicsPathItem(OpenCVTools::convertPolylineToQPainterPath(m_findCentreLine.polyB(), false));
+    item = new QGraphicsPathItem(OpenCVTools::convertPolylineToQPainterPath(m_findCentreLine->polyB(), false));
     item->setPen(QPen(Qt::magenta, 2));
     item->setBrush(Qt::NoBrush);
     m_processedView->addExtraItem(item);
 
-    auto stickList = m_findCentreLine.stickList();
+    auto stickList = m_findCentreLine->stickList();
     for (size_t i = 0; i < stickList.size(); ++i)
     {
         item = new QGraphicsPathItem(OpenCVTools::convertPolylineToQPainterPath(stickList[i], false));
@@ -247,30 +204,37 @@ void MainWindow::straighten()
         m_processedView->addExtraItem(item);
     }
 
-    item = new QGraphicsPathItem(OpenCVTools::convertPolylineToQPainterPath(m_findCentreLine.centreLine(), false));
+    item = new QGraphicsPathItem(OpenCVTools::convertPolylineToQPainterPath(m_findCentreLine->centreLine(), false));
     item->setPen(QPen(Qt::yellow, 2));
     item->setBrush(Qt::NoBrush);
     m_processedView->addExtraItem(item);
+
+    QDir outputImageFolder(m_sidebar->pathEditWidget("outputImageFolder")->path());
+    QFileInfo fileInfo(imageSet->maskImagePath);
+    imageSet->outputImagePath = outputImageFolder.absoluteFilePath(replaceExtension(fileInfo.fileName(), ".png"));
+    imageSet->outputImage = m_processedView->renderSceneToImage();
+    imageSet->outputImage.save(imageSet->outputImagePath);
 
     updateUI();
 }
 
 void MainWindow::straightenMore()
 {
-    m_findCentreLine.straightenMore();
+    if (!m_findCentreLine) return;
+    m_findCentreLine->straightenMore();
 
     m_processedView->clearExtrasItems();
     QGraphicsPathItem *item;
-    item = new QGraphicsPathItem(OpenCVTools::convertPolylineToQPainterPath(m_findCentreLine.polyA(), false));
+    item = new QGraphicsPathItem(OpenCVTools::convertPolylineToQPainterPath(m_findCentreLine->polyA(), false));
     item->setPen(QPen(Qt::cyan, 2));
     item->setBrush(Qt::NoBrush);
     m_processedView->addExtraItem(item);
-    item = new QGraphicsPathItem(OpenCVTools::convertPolylineToQPainterPath(m_findCentreLine.polyB(), false));
+    item = new QGraphicsPathItem(OpenCVTools::convertPolylineToQPainterPath(m_findCentreLine->polyB(), false));
     item->setPen(QPen(Qt::magenta, 2));
     item->setBrush(Qt::NoBrush);
     m_processedView->addExtraItem(item);
 
-    auto stickList = m_findCentreLine.stickList();
+    auto stickList = m_findCentreLine->stickList();
     for (size_t i = 0; i < stickList.size(); ++i)
     {
         item = new QGraphicsPathItem(OpenCVTools::convertPolylineToQPainterPath(stickList[i], false));
@@ -280,12 +244,12 @@ void MainWindow::straightenMore()
     }
 
 
-    item = new QGraphicsPathItem(OpenCVTools::convertPolylineToQPainterPath(m_findCentreLine.centreLine(), false));
+    item = new QGraphicsPathItem(OpenCVTools::convertPolylineToQPainterPath(m_findCentreLine->centreLine(), false));
     item->setPen(QPen(Qt::green, 1));
     item->setBrush(Qt::NoBrush);
     m_processedView->addExtraItem(item);
 
-    m_findCentreLine.createStraightVersion();
+    m_findCentreLine->createStraightVersion();
     updateUI();
 }
 
@@ -307,7 +271,7 @@ void MainWindow::updateUI()
     m_straightenAction->setEnabled(m_framesFolderValid && m_masksFolderValid && m_outputImageFolderValid && m_outputMeshFolderValid &&
                                    !imageSet->maskImage.isNull() &&  m_maskView->position1() && m_maskView->position2());
     m_straightenMoreAction->setEnabled(m_framesFolderValid && m_masksFolderValid && m_outputImageFolderValid && m_outputMeshFolderValid &&
-                                       !imageSet->maskImage.isNull() && !imageSet->outputImage.isNull() &&
+                                       !imageSet->maskImage.isNull() && !imageSet->outputImage.isNull() && m_findCentreLine &&
                                        m_maskView->position1() && m_maskView->position2());
     m_firstImage->setEnabled(m_framesFolderValid && m_masksFolderValid && m_outputImageFolderValid && m_outputMeshFolderValid &&
                              m_imageSetList.size() > 0 && m_imageSetListIndex > 0);
@@ -366,12 +330,6 @@ void MainWindow::updateFileList()
     QStringList fmts;
     for (const QByteArray &fmt : QImageReader::supportedImageFormats()) { fmts << QRegularExpression::escape(QString::fromLatin1(fmt)); }
     QRegularExpression imageRegex(QString(R"(.*\.(%1)$)").arg(fmts.join("|")), QRegularExpression::CaseInsensitiveOption );
-
-    // lambda function to replace the extension on a file
-    auto replaceExtension = [](const QString &filePath, const QString &newExt) {
-        QFileInfo fi(filePath);
-        return fi.path() + "/" + fi.completeBaseName() + "." + newExt;
-    };
 
     QDir framesFolder(m_sidebar->pathEditWidget("framesFolder")->path());
     QDir masksFolder(m_sidebar->pathEditWidget("masksFolder")->path());
@@ -476,12 +434,6 @@ void MainWindow::processCurrentImage()
     {
         if (m_straightenAction->isEnabled())
         {
-            // lambda function to replace the extension on a file
-            auto replaceExtension = [](const QString &filePath, const QString &newExt) {
-                QFileInfo fi(filePath);
-                return fi.path() + "/" + fi.completeBaseName() + "." + newExt;
-            };
-
             straighten();
             for (size_t i = 0; i < m_straightenMoreCount; ++i) straightenMore();
             QDir outputImageFolder(m_sidebar->pathEditWidget("outputImageFolder")->path());
@@ -492,7 +444,7 @@ void MainWindow::processCurrentImage()
 
             QDir outputMeshFolder(m_sidebar->pathEditWidget("outputMeshFolder")->path());
             imageSet->outputMeshPath = outputMeshFolder.absoluteFilePath(replaceExtension(fileInfo.fileName(), ".obj"));
-            auto mesh = m_findCentreLine.straightMesh();
+            auto mesh = m_findCentreLine->straightMesh();
             std::string objVersion = OpenCVTools::meshToOBJ(mesh, "straight_mesh");
             std::ofstream(imageSet->outputMeshPath.toStdString()) << objVersion;
             m_meshView->setMeshes({mesh});
@@ -544,4 +496,10 @@ void MainWindow::previousImage()
     --m_imageSetListIndex;
     if (m_imageSetListIndex < 0) m_imageSetListIndex = 0;
     processCurrentImage();
+}
+
+QString MainWindow::replaceExtension(const QString &filePath, const QString &newExt)
+{
+    QFileInfo fi(filePath);
+    return fi.path() + "/" + fi.completeBaseName() + "." + newExt;
 }

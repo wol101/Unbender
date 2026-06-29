@@ -89,13 +89,13 @@ private:
 
     void readSettings();
     void writeSettings();
-    void openImage();
     void thresholdImage();
     void createMesh();
     static QImage readImageEndednessIndependent(const QString &imagePath);
     void processCurrentImage();
+    static QString replaceExtension(const QString &filePath, const QString &newExt);
 
-    FindCentreLine m_findCentreLine;
+    std::unique_ptr<FindCentreLine> m_findCentreLine;
     size_t m_straightenMoreCount = 0;
 
 };
