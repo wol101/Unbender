@@ -248,6 +248,38 @@ QImage GraphicsView::renderSceneToImage()
     return image;
 }
 
+void GraphicsView::setPosition1(QPointF center)
+{
+    if (!m_position1)
+    {
+        MarkerItem::MarkerShape shape = MarkerItem::Circle;
+        qreal size = 10.0;
+        QColor colour = Qt::green;
+        m_position1 = new MarkerItem(center, shape, size, colour);
+        scene()->addItem(m_position1);
+    }
+    else
+    {
+        m_position1->setPos(center);
+    }
+}
+
+void GraphicsView::setPosition2(QPointF center)
+{
+    if (!m_position2)
+    {
+        MarkerItem::MarkerShape shape = MarkerItem::Circle;
+        qreal size = 10.0;
+        QColor colour = Qt::green;
+        m_position1 = new MarkerItem(center, shape, size, colour);
+        scene()->addItem(m_position2);
+    }
+    else
+    {
+        m_position2->setPos(center);
+    }
+}
+
 MarkerItem *GraphicsView::position2() const
 {
     return m_position2;

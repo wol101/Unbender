@@ -33,6 +33,10 @@ public:
 
     MarkerItem *position2() const;
 
+    void setPosition1(QPointF center);
+
+    void setPosition2(QPointF center);
+
 protected:
     void wheelEvent(QWheelEvent *event) override;
     void mousePressEvent(QMouseEvent *event) override;

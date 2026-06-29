@@ -75,8 +75,8 @@ private:
         QString maskImagePath;
         QString outputImagePath;
         QString outputMeshPath;
-        cv::Point2f pStart;
-        cv::Point2f pEnd;
+        cv::Point2f pStart = {-1.f, -1.f};
+        cv::Point2f pEnd = {-1.f, -1.f};
         bool recalculate = false;
     };
     std::vector<std::unique_ptr<ImageSet>> m_imageSetList;

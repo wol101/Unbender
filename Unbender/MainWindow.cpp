@@ -122,9 +122,9 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent) , m_ui(new Ui::Mai
     setWindowTitle("Unbender");
 
     readSettings();
+    updateUI();
     updateFileList();
     firstImage();
-    updateUI();
 }
 
 MainWindow::~MainWindow()
@@ -217,8 +217,9 @@ void MainWindow::straighten()
     m_findCentreLine.setImg(OpenCVTools::convertQImageToMat(imageSet->frameImage));
 
     MarkerItem *p1 = m_processedView->position1();
-    m_findCentreLine.setUserPoint1(cv::Point2f(p1->pos().x(), p1->pos().y()));
     MarkerItem *p2 = m_processedView->position2();
+    if (!p1 || !p2) return;
+    m_findCentreLine.setUserPoint1(cv::Point2f(p1->pos().x(), p1->pos().y()));
     m_findCentreLine.setUserPoint2(cv::Point2f(p2->pos().x(), p2->pos().y()));
 
     m_findCentreLine.straighten();
@@ -290,7 +291,10 @@ void MainWindow::straightenMore()
 
 void MainWindow::updateUI()
 {
-    const ImageSet *imageSet = m_imageSetList[m_imageSetListIndex].get();
+    const ImageSet *imageSet;
+    const static ImageSet nullImageSet;
+    if (m_imageSetListIndex > 0) imageSet = m_imageSetList[m_imageSetListIndex].get();
+    else imageSet = &nullImageSet;
     QFileInfo framesFolderInfo(m_sidebar->pathEditWidget("framesFolder")->path());
     QFileInfo masksFolderInfo(m_sidebar->pathEditWidget("masksFolder")->path());
     QFileInfo outputImageFolderInfo(m_sidebar->pathEditWidget("outputImageFolder")->path());
@@ -347,49 +351,67 @@ void MainWindow::updateFileList()
 {
     m_imageSetList.clear();
     m_imageSetListIndex = -1;
+    QFileInfo framesFolderInfo(m_sidebar->pathEditWidget("framesFolder")->path());
+    QFileInfo masksFolderInfo(m_sidebar->pathEditWidget("masksFolder")->path());
+    QFileInfo outputImageFolderInfo(m_sidebar->pathEditWidget("outputImageFolder")->path());
+    QFileInfo outputMeshFolderInfo(m_sidebar->pathEditWidget("outputMeshFolder")->path());
+    m_framesFolderValid = framesFolderInfo.isDir() && framesFolderInfo.isReadable();
+    m_masksFolderValid = masksFolderInfo.isDir() && masksFolderInfo.isReadable() && masksFolderInfo.isWritable();
+    m_outputImageFolderValid = outputImageFolderInfo.isDir() && outputImageFolderInfo.isReadable() && outputImageFolderInfo.isWritable();
+    m_outputMeshFolderValid = outputMeshFolderInfo.isDir() && outputMeshFolderInfo.isReadable() && outputMeshFolderInfo.isWritable();
     if (!m_framesFolderValid || !m_masksFolderValid || !m_outputImageFolderValid || !m_outputMeshFolderValid) return;
+
+    // get the image formats that Qt supports dynamically (because it depends on plug ins)
+    QStringList fmts;
+    for (const QByteArray &fmt : QImageReader::supportedImageFormats()) { fmts << QRegularExpression::escape(QString::fromLatin1(fmt)); }
+    QRegularExpression imageRegex(QString(R"(.*\.(%1)$)").arg(fmts.join("|")), QRegularExpression::CaseInsensitiveOption );
+
+    // lambda function to replace the extension on a file
+    auto replaceExtension = [](const QString &filePath, const QString &newExt) {
+        QFileInfo fi(filePath);
+        return fi.path() + "/" + fi.completeBaseName() + "." + newExt;
+    };
 
     QDir framesFolder(m_sidebar->pathEditWidget("framesFolder")->path());
     QDir masksFolder(m_sidebar->pathEditWidget("masksFolder")->path());
     QDir outputImageFolder(m_sidebar->pathEditWidget("outputImageFolder")->path());
     QDir outputMeshFolder(m_sidebar->pathEditWidget("outputMeshFolder")->path());
     QStringList allFiles = masksFolder.entryList(QDir::Files);
-    QString imageFileMatchRegex = "^.*\\.png$";
-    QRegularExpression re(imageFileMatchRegex, QRegularExpression::CaseInsensitiveOption);
     for (auto &&file : allFiles)
     {
-        if (re.match(file).hasMatch()) // only .png files
+        if (imageRegex.match(file).hasMatch()) // only image files
         {
-            ImageSet imageSet;
+            std::unique_ptr<ImageSet> imageSet = std::make_unique<ImageSet>();
             // there must always be a mask
             QString path = masksFolder.absoluteFilePath(file);
             QImage image = readImageEndednessIndependent(path);
             if (image.isNull()) continue;
-            imageSet.maskImagePath = path;
-            imageSet.maskImage = image;
+            imageSet->maskImagePath = path;
+            imageSet->maskImage = image;
             // but the others might not exist yet
             path = framesFolder.absoluteFilePath(file);
             image = readImageEndednessIndependent(path);
             if (!image.isNull())
             {
-                imageSet.frameImagePath = path;
-                imageSet.frameImage = image;
+                imageSet->frameImagePath = path;
+                imageSet->frameImage = image;
             }
             path = outputImageFolder.absoluteFilePath(file);
             image = readImageEndednessIndependent(path);
             if (!image.isNull())
             {
-                imageSet.outputImagePath = path;
-                imageSet.outputImage = image;
+                imageSet->outputImagePath = path;
+                imageSet->outputImage = image;
             }
-            path = outputMeshFolder.absoluteFilePath(file.replace(".png", ".obj", Qt::CaseInsensitive));
+            path = outputMeshFolder.absoluteFilePath(replaceExtension(file, ".obj"));
             OpenCVTools::Mesh mesh;
             OpenCVTools::ObjError err = OpenCVTools::loadObj(path.toStdString(), mesh);
             if (err == OpenCVTools::ObjError::OK)
             {
-                imageSet.outputMeshPath = path;
-                imageSet.outputMesh = mesh;
+                imageSet->outputMeshPath = path;
+                imageSet->outputMesh = mesh;
             }
+            m_imageSetList.push_back(std::move(imageSet));
         }
     }
 }
@@ -451,20 +473,29 @@ void MainWindow::processCurrentImage()
     if (!imageSet->outputImage.isNull()) { m_processedView->setImage(new QGraphicsPixmapItem(QPixmap::fromImage(imageSet->outputImage))); }
     else
     {
-        straighten();
-        for (size_t i = 0; i < m_straightenMoreCount; ++i) straightenMore();
-        QDir outputImageFolder(m_sidebar->pathEditWidget("outputImageFolder")->path());
-        QFileInfo fileInfo(imageSet->maskImagePath);
-        imageSet->outputImagePath = outputImageFolder.absoluteFilePath(fileInfo.fileName());
-        imageSet->outputImage = m_processedView->renderSceneToImage();
-        imageSet->outputImage.save(imageSet->outputImagePath);
+        if (m_straightenAction->isEnabled())
+        {
+            // lambda function to replace the extension on a file
+            auto replaceExtension = [](const QString &filePath, const QString &newExt) {
+                QFileInfo fi(filePath);
+                return fi.path() + "/" + fi.completeBaseName() + "." + newExt;
+            };
 
-        QDir outputMeshFolder(m_sidebar->pathEditWidget("outputMeshFolder")->path());
-        imageSet->outputMeshPath = outputMeshFolder.absoluteFilePath(fileInfo.fileName().replace(".png", ".obj", Qt::CaseInsensitive));
-        auto mesh = m_findCentreLine.straightMesh();
-        std::string objVersion = OpenCVTools::meshToOBJ(mesh, "straight_mesh");
-        std::ofstream(imageSet->outputMeshPath.toStdString()) << objVersion;
-        m_meshView->setMeshes({mesh});
+            straighten();
+            for (size_t i = 0; i < m_straightenMoreCount; ++i) straightenMore();
+            QDir outputImageFolder(m_sidebar->pathEditWidget("outputImageFolder")->path());
+            QFileInfo fileInfo(imageSet->maskImagePath);
+            imageSet->outputImagePath = outputImageFolder.absoluteFilePath(replaceExtension(fileInfo.fileName(), ".png"));
+            imageSet->outputImage = m_processedView->renderSceneToImage();
+            imageSet->outputImage.save(imageSet->outputImagePath);
+
+            QDir outputMeshFolder(m_sidebar->pathEditWidget("outputMeshFolder")->path());
+            imageSet->outputMeshPath = outputMeshFolder.absoluteFilePath(replaceExtension(fileInfo.fileName(), ".obj"));
+            auto mesh = m_findCentreLine.straightMesh();
+            std::string objVersion = OpenCVTools::meshToOBJ(mesh, "straight_mesh");
+            std::ofstream(imageSet->outputMeshPath.toStdString()) << objVersion;
+            m_meshView->setMeshes({mesh});
+        }
     }
 }
 
