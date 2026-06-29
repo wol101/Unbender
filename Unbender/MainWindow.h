@@ -40,6 +40,7 @@ private slots:
     void saveDocument();
     void straighten();
     void straightenMore();
+    void createMesh();
     void updateFileList();
     void firstImage();
     void lastImage();
@@ -60,6 +61,7 @@ private:
 
     QAction *m_straightenAction = 0;
     QAction *m_straightenMoreAction = 0;
+    QAction *m_createMeshAction = 0;
     QAction *m_firstImage = 0;
     QAction *m_lastImage = 0;
     QAction *m_nextImage = 0;
@@ -89,14 +91,12 @@ private:
 
     void readSettings();
     void writeSettings();
-    void thresholdImage();
-    void createMesh();
     static QImage readImageEndednessIndependent(const QString &imagePath);
     void processCurrentImage();
     static QString replaceExtension(const QString &filePath, const QString &newExt);
 
     std::unique_ptr<FindCentreLine> m_findCentreLine;
-    size_t m_straightenMoreCount = 0;
+    size_t m_straightenMoreCount = 1;
 
 };
 #endif // MAINWINDOW_H

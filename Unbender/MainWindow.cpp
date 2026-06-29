@@ -86,6 +86,7 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent) , m_ui(new Ui::Mai
 
     m_straightenAction = new QAction(tr("Straighten"), this);
     m_straightenMoreAction = new QAction(tr("Straighten More"), this);
+    m_createMeshAction = new QAction(tr("Create Mesh"), this);
 
     m_firstImage = new QAction(style()->standardIcon(QStyle::SP_MediaSkipBackward), tr("First Image"), this);
     m_lastImage = new QAction(style()->standardIcon(QStyle::SP_MediaSkipForward), tr("Last Images"), this);
@@ -110,10 +111,12 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent) , m_ui(new Ui::Mai
     QMenu *actionMenu = menuBar()->addMenu(tr("&Action"));
     actionMenu->addAction(m_straightenAction);
     actionMenu->addAction(m_straightenMoreAction);
+    actionMenu->addAction(m_createMeshAction);
 
     connect(quitAction, &QAction::triggered, this, &MainWindow::close);
     connect(m_straightenAction, &QAction::triggered, this, &MainWindow::straighten);
     connect(m_straightenMoreAction, &QAction::triggered, this, &MainWindow::straightenMore);
+    connect(m_createMeshAction, &QAction::triggered, this, &MainWindow::createMesh);
     connect(m_firstImage, &QAction::triggered, this, &MainWindow::firstImage);
     connect(m_lastImage, &QAction::triggered, this, &MainWindow::lastImage);
     connect(m_nextImage, &QAction::triggered, this, &MainWindow::nextImage);
@@ -253,6 +256,18 @@ void MainWindow::straightenMore()
     updateUI();
 }
 
+void MainWindow::createMesh()
+{
+    ImageSet *imageSet = m_imageSetList[m_imageSetListIndex].get();
+    QFileInfo fileInfo(imageSet->maskImagePath);
+    QDir outputMeshFolder(m_sidebar->pathEditWidget("outputMeshFolder")->path());
+    imageSet->outputMeshPath = outputMeshFolder.absoluteFilePath(replaceExtension(fileInfo.fileName(), ".obj"));
+    auto mesh = m_findCentreLine->straightMesh();
+    std::string objVersion = OpenCVTools::meshToOBJ(mesh, "straight_mesh");
+    std::ofstream(imageSet->outputMeshPath.toStdString()) << objVersion;
+    m_meshView->setMeshes({mesh});
+    updateUI();
+}
 
 void MainWindow::updateUI()
 {
@@ -273,6 +288,9 @@ void MainWindow::updateUI()
     m_straightenMoreAction->setEnabled(m_framesFolderValid && m_masksFolderValid && m_outputImageFolderValid && m_outputMeshFolderValid &&
                                        !imageSet->maskImage.isNull() && !imageSet->outputImage.isNull() && m_findCentreLine &&
                                        m_maskView->position1() && m_maskView->position2());
+    m_createMeshAction->setEnabled(m_framesFolderValid && m_masksFolderValid && m_outputImageFolderValid && m_outputMeshFolderValid &&
+                                       !imageSet->maskImage.isNull() && !imageSet->outputImage.isNull() && m_findCentreLine &&
+                                       m_maskView->position1() && m_maskView->position2() && m_findCentreLine->straightMesh().triangles.size());
     m_firstImage->setEnabled(m_framesFolderValid && m_masksFolderValid && m_outputImageFolderValid && m_outputMeshFolderValid &&
                              m_imageSetList.size() > 0 && m_imageSetListIndex > 0);
     m_previousImage->setEnabled(m_framesFolderValid && m_masksFolderValid && m_outputImageFolderValid && m_outputMeshFolderValid &&
