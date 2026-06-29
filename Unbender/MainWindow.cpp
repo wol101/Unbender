@@ -217,8 +217,8 @@ void MainWindow::straighten()
     m_findCentreLine.setThresholdValue(m_sidebar->spinBox("threshold")->value());
     m_findCentreLine.setImg(OpenCVTools::convertQImageToMat(imageSet->frameImage));
 
-    MarkerItem *p1 = m_processedView->position1();
-    MarkerItem *p2 = m_processedView->position2();
+    MarkerItem *p1 = m_maskView->position1();
+    MarkerItem *p2 = m_maskView->position2();
     if (!p1 || !p2) return;
     m_findCentreLine.setUserPoint1(cv::Point2f(p1->pos().x(), p1->pos().y()));
     m_findCentreLine.setUserPoint2(cv::Point2f(p2->pos().x(), p2->pos().y()));
