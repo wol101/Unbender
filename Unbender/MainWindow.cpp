@@ -118,6 +118,7 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent) , m_ui(new Ui::Mai
     connect(m_lastImage, &QAction::triggered, this, &MainWindow::lastImage);
     connect(m_nextImage, &QAction::triggered, this, &MainWindow::nextImage);
     connect(m_previousImage, &QAction::triggered, this, &MainWindow::previousImage);
+    connect(m_maskView, &GraphicsView::uiUpdateRequested, this, &MainWindow::updateUI);
 
     setWindowTitle("Unbender");
 
@@ -293,7 +294,7 @@ void MainWindow::updateUI()
 {
     const ImageSet *imageSet;
     const static ImageSet nullImageSet;
-    if (m_imageSetListIndex > 0) imageSet = m_imageSetList[m_imageSetListIndex].get();
+    if (m_imageSetListIndex >= 0) imageSet = m_imageSetList[m_imageSetListIndex].get();
     else imageSet = &nullImageSet;
     QFileInfo framesFolderInfo(m_sidebar->pathEditWidget("framesFolder")->path());
     QFileInfo masksFolderInfo(m_sidebar->pathEditWidget("masksFolder")->path());
@@ -304,10 +305,10 @@ void MainWindow::updateUI()
     m_outputImageFolderValid = outputImageFolderInfo.isDir() && outputImageFolderInfo.isReadable() && outputImageFolderInfo.isWritable();
     m_outputMeshFolderValid = outputMeshFolderInfo.isDir() && outputMeshFolderInfo.isReadable() && outputMeshFolderInfo.isWritable();
     m_straightenAction->setEnabled(m_framesFolderValid && m_masksFolderValid && m_outputImageFolderValid && m_outputMeshFolderValid &&
-                                   !imageSet->maskImage.isNull() &&  m_processedView->position1() && m_processedView->position2());
+                                   !imageSet->maskImage.isNull() &&  m_maskView->position1() && m_maskView->position2());
     m_straightenMoreAction->setEnabled(m_framesFolderValid && m_masksFolderValid && m_outputImageFolderValid && m_outputMeshFolderValid &&
                                        !imageSet->maskImage.isNull() && !imageSet->outputImage.isNull() &&
-                                       m_processedView->position1() && m_processedView->position2());
+                                       m_maskView->position1() && m_maskView->position2());
     m_firstImage->setEnabled(m_framesFolderValid && m_masksFolderValid && m_outputImageFolderValid && m_outputMeshFolderValid &&
                              m_imageSetList.size() > 0 && m_imageSetListIndex > 0);
     m_previousImage->setEnabled(m_framesFolderValid && m_masksFolderValid && m_outputImageFolderValid && m_outputMeshFolderValid &&

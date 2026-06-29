@@ -58,7 +58,6 @@ void GraphicsView::mousePressEvent(QMouseEvent *event)
             m_cursor->setPos(centre);
         }
         if (QMainWindow* mainWindow = qobject_cast<QMainWindow*>(this->window())) { mainWindow->statusBar()->showMessage(QString("Cursor x = %1 y = %2").arg(m_cursor->pos().x()).arg(m_cursor->pos().y()), 10000); }
-        if (MainWindow* mainWindow = qobject_cast<MainWindow*>(this->window())) { mainWindow->updateUI(); }
         event->accept();
         return;
     }
@@ -144,7 +143,7 @@ void GraphicsView::keyPressEvent(QKeyEvent* event)
                 m_position1->setPos(m_cursor->pos());
             }
             if (QMainWindow* mainWindow = qobject_cast<QMainWindow*>(this->window())) { mainWindow->statusBar()->showMessage(QString("Position 1 x = %1 y = %2").arg(m_position1->pos().x()).arg(m_position1->pos().y()), 10000); }
-            if (MainWindow* mainWindow = qobject_cast<MainWindow*>(this->window())) { mainWindow->updateUI(); }
+            emit uiUpdateRequested();
             break;
         }
         if (event->key() == Qt::Key_2)
@@ -163,7 +162,7 @@ void GraphicsView::keyPressEvent(QKeyEvent* event)
                 m_position2->setPos(m_cursor->pos());
             }
             if (QMainWindow* mainWindow = qobject_cast<QMainWindow*>(this->window())) { mainWindow->statusBar()->showMessage(QString("Position 2 x = %1 y = %2").arg(m_position2->pos().x()).arg(m_position2->pos().y()), 10000); }
-            if (MainWindow* mainWindow = qobject_cast<MainWindow*>(this->window())) { mainWindow->updateUI(); }
+            emit uiUpdateRequested();
             break;
         }
         QGraphicsView::keyPressEvent(event); // Pass to base class

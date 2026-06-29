@@ -12,6 +12,8 @@ class QGraphicsPathItem;
 
 class GraphicsView : public QGraphicsView
 {
+    Q_OBJECT
+
 public:
     GraphicsView(QGraphicsScene *scene, QWidget *parent = nullptr);
 
@@ -36,6 +38,9 @@ public:
     void setPosition1(QPointF center);
 
     void setPosition2(QPointF center);
+
+signals:
+    void uiUpdateRequested();
 
 protected:
     void wheelEvent(QWheelEvent *event) override;
