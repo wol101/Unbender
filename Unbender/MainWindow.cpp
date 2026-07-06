@@ -58,7 +58,6 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent) , m_ui(new Ui::Mai
     m_sidebar->addPathEditWidget("Output Images", "outputImageFolder", PathEditWidget::DirectoryMode, "");
     m_sidebar->addPathEditWidget("Output Meshes", "outputMeshFolder", PathEditWidget::DirectoryMode, "");
     m_sidebar->addSpinBox("Threshold", "threshold", 0, 255, 127);
-    m_sidebar->addCheckBox("Invert", "invert", 0);
     m_sidebar->addSpacer();
 
     // Right side: the four pane viewport
@@ -95,6 +94,7 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent) , m_ui(new Ui::Mai
     m_straightenAction = new QAction(tr("Straighten"), this);
     m_straightenMoreAction = new QAction(tr("Straighten More"), this);
     m_createMeshAction = new QAction(tr("Create Mesh"), this);
+    m_processImagesAction = new QAction(tr("Process Images"), this);
 
     m_firstImage = new QAction(style()->standardIcon(QStyle::SP_MediaSkipBackward), tr("First Image"), this);
     m_lastImage = new QAction(style()->standardIcon(QStyle::SP_MediaSkipForward), tr("Last Images"), this);
@@ -125,6 +125,7 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent) , m_ui(new Ui::Mai
     actionMenu->addAction(m_straightenAction);
     actionMenu->addAction(m_straightenMoreAction);
     actionMenu->addAction(m_createMeshAction);
+    actionMenu->addAction(m_processImagesAction);
 
     connect(openAction, &QAction::triggered, this, &MainWindow::openDocument);
     connect(quitAction, &QAction::triggered, this, &MainWindow::close);
@@ -195,11 +196,14 @@ void MainWindow::openDocument()
     fileName = QFileDialog::getOpenFileName(this, tr("Open Config File"), info.absoluteFilePath(), tr("Unbender Files (*.xml);;Any File (*.* *)"), nullptr);
     if (fileName.isNull() == false)
     {
+        if (readXMLFile(fileName.toStdString()))
+        {
+            statusBar()->showMessage(QString::fromStdString(m_lastError));
+            return;
+        }
         m_lastFileOpened = fileName;
         setWindowTitle(fileName);
         statusBar()->showMessage(fileName + " opened");
-
-
     }
 }
 
@@ -229,13 +233,13 @@ std::string *MainWindow::readXMLFile(const std::string &inputPath)
         return &m_lastError;
     }
 
-    std::map<std::string, std::string> globalData;
-    std::vector<std::map<std::string, std::string>> imageData;
+    m_globalData.clear();
+    m_imageData.clear();
 
     pugi::xml_node globalNode = root.child("GLOBAL");
     if (globalNode)
     {
-        globalData = ReadAttributes(globalNode);
+        m_globalData = ReadAttributes(globalNode);
     }
     else
     {
@@ -245,14 +249,46 @@ std::string *MainWindow::readXMLFile(const std::string &inputPath)
 
     for (pugi::xml_node imageNode = root.child("IMAGE"); imageNode; imageNode = imageNode.next_sibling("IMAGE"))
     {
-        imageData.push_back(ReadAttributes(imageNode));
+        m_imageData.push_back(ReadAttributes(imageNode));
     }
-    if (imageData.size() == 0)
+    if (m_imageData.size() == 0)
     {
         m_lastError = "Error: no <IMAGE> elements found"s;
         return &m_lastError;
     }
 
+    m_lastError.clear();
+    return 0;
+}
+
+std::string *MainWindow::writeXMLFile(const std::string &outputPath)
+{
+    auto WriteAttributes = [](pugi::xml_node& node, const std::map<std::string, std::string>& attrs)
+    {
+        for (const auto& [name, value] : attrs) {
+            node.append_attribute(name.c_str()) = value.c_str();
+        }
+    };
+
+    pugi::xml_document outDoc;
+    pugi::xml_node outRoot = outDoc.append_child("UNBENDER");
+
+    pugi::xml_node outGlobal = outRoot.append_child("GLOBAL");
+    WriteAttributes(outGlobal, m_globalData);
+
+    for (const auto& image : m_imageData)
+    {
+        pugi::xml_node outImage = outRoot.append_child("IMAGE");
+        WriteAttributes(outImage, image);
+    }
+
+    if (!outDoc.save_file(outputPath.c_str()))
+    {
+        m_lastError = "Failed to save '"s + outputPath + "'"s;
+        return &m_lastError;
+    }
+
+    m_lastError.clear();
     return 0;
 }
 
@@ -260,6 +296,102 @@ void MainWindow::saveDocument()
 {
     updateUI();
 }
+
+void MainWindow::processImages()
+{
+    auto parseDoubleList = [](const std::string &str) -> std::vector<double> {
+        std::vector<double> result;
+        size_t i = 0;
+        const size_t n = str.size();
+
+        while (i < n) {
+            // Skip leading whitespace
+            while (i < n && std::isspace(static_cast<unsigned char>(str[i])))
+                ++i;
+            if (i >= n)
+                break;
+
+            // Find end of this token
+            size_t tokenStart = i;
+            while (i < n && !std::isspace(static_cast<unsigned char>(str[i])))
+                ++i;
+
+            // Try to parse the token
+            double value{};
+            auto [ptr, ec] = std::from_chars(str.data() + tokenStart, str.data() + i, value);
+            if (ec == std::errc() && ptr == str.data() + i)
+                result.push_back(value);
+            // else: skip invalid token silently
+        }
+
+        return result;
+    };
+
+    // check that everything is in place
+    QFileInfo framesFolderInfo(QString::fromStdString(m_globalData["FrameFolder"]));
+    QFileInfo masksFolderInfo(QString::fromStdString(m_globalData["MaskFolder"]));
+    QFileInfo outputImageFolderInfo(QString::fromStdString(m_globalData["OutputImages"]));
+    QFileInfo outputMeshFolderInfo(QString::fromStdString(m_globalData["OutputMeshes"]));
+    m_framesFolderValid = framesFolderInfo.isDir() && framesFolderInfo.isReadable();
+    m_masksFolderValid = masksFolderInfo.isDir() && masksFolderInfo.isReadable();
+    m_outputImageFolderValid = outputImageFolderInfo.isDir() && outputImageFolderInfo.isReadable() && outputImageFolderInfo.isWritable();
+    m_outputMeshFolderValid = outputMeshFolderInfo.isDir() && outputMeshFolderInfo.isReadable() && outputMeshFolderInfo.isWritable();
+    if (!m_masksFolderValid)
+    {
+        statusBar()->showMessage(masksFolderInfo.absoluteFilePath() + " is not valid");
+        return;
+    }
+    if (!m_outputImageFolderValid)
+    {
+        if (outputImageFolderInfo.exists())
+        {
+            statusBar()->showMessage(outputImageFolderInfo.absoluteFilePath() + " exists but is not a read/write folder");
+            return;
+        }
+        QDir dir;
+        if (!dir.mkpath(outputImageFolderInfo.absoluteFilePath()))
+        {
+            statusBar()->showMessage(outputImageFolderInfo.absoluteFilePath() + " creation failed");
+            return;
+        }
+    }
+    if (!m_outputMeshFolderValid)
+    {
+        if (outputMeshFolderInfo.exists())
+        {
+            statusBar()->showMessage(outputMeshFolderInfo.absoluteFilePath() + " exists but is not a read/write folder");
+            return;
+        }
+        QDir dir;
+        if (!dir.mkpath(outputMeshFolderInfo.absoluteFilePath()))
+        {
+            statusBar()->showMessage(outputMeshFolderInfo.absoluteFilePath() + " creation failed");
+            return;
+        }
+    }
+    std::vector<double> threshold = parseDoubleList(m_globalData["Threshold"]);
+
+    // now loop through the images
+    for (auto &&image : m_imageData)
+    {
+        QImage maskImage = readImageEndednessIndependent(QString::fromStdString(image["Mask"]));
+        m_findCentreLine = std::make_unique<FindCentreLine>();
+        m_findCentreLine->setThresholdValue(threshold[0]);
+        m_findCentreLine->setImg(OpenCVTools::convertQImageToMat(maskImage));
+
+        std::vector<double> point1 = parseDoubleList(image["Point1"]);
+        std::vector<double> point2 = parseDoubleList(image["Point2"]);
+        cv::Point2f pStart(point1[0], point1[1]);
+        cv::Point2f pEnd(point2[0], point2[1]);
+        m_findCentreLine->setUserPoint1(pStart);
+        m_findCentreLine->setUserPoint2(pEnd);
+
+        m_findCentreLine->straighten();
+
+
+    }
+}
+
 
 void MainWindow::straighten()
 {

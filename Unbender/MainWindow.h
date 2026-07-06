@@ -42,6 +42,7 @@ private slots:
     void straighten();
     void straightenMore();
     void createMesh();
+    void processImages();
     void updateFileList();
     void firstImage();
     void lastImage();
@@ -63,6 +64,7 @@ private:
     QAction *m_straightenAction = 0;
     QAction *m_straightenMoreAction = 0;
     QAction *m_createMeshAction = 0;
+    QAction *m_processImagesAction = 0;
     QAction *m_firstImage = 0;
     QAction *m_lastImage = 0;
     QAction *m_nextImage = 0;
@@ -101,6 +103,10 @@ private:
     size_t m_straightenMoreCount = 1;
 
     std::string *readXMLFile(const std::string &inputPath);
+    std::string *writeXMLFile(const std::string &outputPath);
     std::string m_lastError;
+    std::map<std::string, std::string> m_globalData;
+    std::vector<std::map<std::string, std::string>> m_imageData;
+
 };
 #endif // MAINWINDOW_H
