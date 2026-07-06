@@ -8,6 +8,8 @@
 #include "Sidebar.h"
 #include "FourPaneViewport.h"
 
+#include <pugixml.hpp>
+
 #include <QGraphicsView>
 #include <QGraphicsScene>
 #include <QGraphicsPixmapItem>
@@ -30,6 +32,7 @@
 
 #include <fstream>
 
+using namespace std::literals::string_literals;
 
 MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent) , m_ui(new Ui::MainWindow)
 {
@@ -78,10 +81,15 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent) , m_ui(new Ui::Mai
     m_splitter->addWidget(m_sidebar);
     m_splitter->addWidget(m_fourPaneViewport);
 
-    // Force even split
-    m_splitter->setSizes({1, 4});
+    // Suggested sizes
+    QList<int> initialSizes = m_splitter->sizes();
+    int totalSize = initialSizes[0] + initialSizes[1];
+    int left = totalSize / 4;
+    int right = totalSize - left;
+    m_splitter->setSizes({left, right});
 
     // Create actions
+    auto *openAction = new QAction(style()->standardIcon(QStyle::SP_DialogOpenButton), tr("Open"), this);
     auto *quitAction = new QAction(style()->standardIcon(QStyle::SP_TitleBarCloseButton), tr("Quit"), this);
 
     m_straightenAction = new QAction(tr("Straighten"), this);
@@ -109,6 +117,8 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent) , m_ui(new Ui::Mai
 
     // Create menus
     QMenu *fileMenu = menuBar()->addMenu(tr("&File"));
+    fileMenu->addAction(openAction);
+    fileMenu->addSeparator();
     fileMenu->addAction(quitAction);
 
     QMenu *actionMenu = menuBar()->addMenu(tr("&Action"));
@@ -116,6 +126,7 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent) , m_ui(new Ui::Mai
     actionMenu->addAction(m_straightenMoreAction);
     actionMenu->addAction(m_createMeshAction);
 
+    connect(openAction, &QAction::triggered, this, &MainWindow::openDocument);
     connect(quitAction, &QAction::triggered, this, &MainWindow::close);
     connect(m_straightenAction, &QAction::triggered, this, &MainWindow::straighten);
     connect(m_straightenMoreAction, &QAction::triggered, this, &MainWindow::straightenMore);
@@ -168,6 +179,83 @@ void MainWindow::closeEvent(QCloseEvent *event)
     }
 }
 
+void MainWindow::openDocument()
+{
+    if (this->isWindowModified())
+    {
+        int ret = QMessageBox::warning(this, tr("Current document contains unsaved changes"),
+                                       tr("Opening a new document will delete the current document.\nAre you sure you want to continue?"),
+                                       QMessageBox::Ok | QMessageBox::Cancel, QMessageBox::Cancel);
+        if (ret == QMessageBox::Cancel) return;
+    }
+
+    QFileInfo info(m_lastFileOpened);
+    QString fileName;
+
+    fileName = QFileDialog::getOpenFileName(this, tr("Open Config File"), info.absoluteFilePath(), tr("Unbender Files (*.xml);;Any File (*.* *)"), nullptr);
+    if (fileName.isNull() == false)
+    {
+        m_lastFileOpened = fileName;
+        setWindowTitle(fileName);
+        statusBar()->showMessage(fileName + " opened");
+
+
+    }
+}
+
+std::string *MainWindow::readXMLFile(const std::string &inputPath)
+{
+    auto ReadAttributes = [](const pugi::xml_node& node) -> std::map<std::string, std::string>
+    {
+        std::map<std::string, std::string> attrs;
+        for (pugi::xml_attribute attr : node.attributes()) {
+            attrs[attr.name()] = attr.value();
+        }
+        return attrs;
+    };
+
+    pugi::xml_document doc;
+    pugi::xml_parse_result result = doc.load_file(inputPath.c_str());
+    if (!result)
+    {
+        m_lastError = "Failed to load '"s + inputPath + "': "s + result.description();
+        return &m_lastError;
+    }
+
+    pugi::xml_node root = doc.child("UNBENDER");
+    if (!root)
+    {
+        m_lastError = "No <UNBENDER> root element found in '"s + inputPath + "'"s;
+        return &m_lastError;
+    }
+
+    std::map<std::string, std::string> globalData;
+    std::vector<std::map<std::string, std::string>> imageData;
+
+    pugi::xml_node globalNode = root.child("GLOBAL");
+    if (globalNode)
+    {
+        globalData = ReadAttributes(globalNode);
+    }
+    else
+    {
+        m_lastError = "Error: no <GLOBAL> element found"s;
+        return &m_lastError;
+    }
+
+    for (pugi::xml_node imageNode = root.child("IMAGE"); imageNode; imageNode = imageNode.next_sibling("IMAGE"))
+    {
+        imageData.push_back(ReadAttributes(imageNode));
+    }
+    if (imageData.size() == 0)
+    {
+        m_lastError = "Error: no <IMAGE> elements found"s;
+        return &m_lastError;
+    }
+
+    return 0;
+}
+
 void MainWindow::saveDocument()
 {
     updateUI();
@@ -178,7 +266,7 @@ void MainWindow::straighten()
     ImageSet *imageSet = m_imageSetList[m_imageSetListIndex].get();
     m_findCentreLine = std::make_unique<FindCentreLine>();
     m_findCentreLine->setThresholdValue(m_sidebar->spinBox("threshold")->value());
-    m_findCentreLine->setImg(OpenCVTools::convertQImageToMat(imageSet->frameImage));
+    m_findCentreLine->setImg(OpenCVTools::convertQImageToMat(imageSet->maskImage));
 
     MarkerItem *p1 = m_maskView->position1();
     MarkerItem *p2 = m_maskView->position2();
@@ -328,7 +416,7 @@ void MainWindow::readSettings()
     m_sidebar->pathEditWidget("outputImageFolder")->setPath(settings.value("outputImageFolder", "").toString());
     m_sidebar->pathEditWidget("outputMeshFolder")->setPath(settings.value("outputMeshFolder", "").toString());
     m_sidebar->spinBox("threshold")->setValue(settings.value("threshold", "127").toInt());
-    m_sidebar->checkBox("invert")->setChecked(settings.value("invert", "0").toBool());
+    m_lastFileOpened = settings.value("lastFileOpened", "").toString();
 }
 
 void MainWindow::writeSettings()
@@ -339,7 +427,7 @@ void MainWindow::writeSettings()
     settings.setValue("outputImageFolder", m_sidebar->pathEditWidget("outputImageFolder")->path());
     settings.setValue("outputMeshFolder", m_sidebar->pathEditWidget("outputMeshFolder")->path());
     settings.setValue("threshold", m_sidebar->spinBox("threshold")->value());
-    settings.setValue("invert", m_sidebar->checkBox("invert")->isChecked());
+    settings.setValue("lastFileOpened", m_lastFileOpened);
     settings.setValue("splitterState", m_splitter->saveState());
     settings.setValue("geometry", saveGeometry());
     settings.setValue("windowState", saveState());

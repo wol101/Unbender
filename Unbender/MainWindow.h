@@ -37,6 +37,7 @@ protected:
     void closeEvent(QCloseEvent *event) override;
 
 private slots:
+    void openDocument();
     void saveDocument();
     void straighten();
     void straightenMore();
@@ -94,9 +95,12 @@ private:
     static QImage readImageEndednessIndependent(const QString &imagePath);
     void processCurrentImage();
     static QString replaceExtension(const QString &filePath, const QString &newExt);
+    QString m_lastFileOpened;
 
     std::unique_ptr<FindCentreLine> m_findCentreLine;
     size_t m_straightenMoreCount = 1;
 
+    std::string *readXMLFile(const std::string &inputPath);
+    std::string m_lastError;
 };
 #endif // MAINWINDOW_H

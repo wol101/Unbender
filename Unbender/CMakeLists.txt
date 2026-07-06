@@ -23,12 +23,6 @@ set(PROJECT_SOURCES
         MainWindow.cpp
         MainWindow.h
         MainWindow.ui
-)
-
-if(${QT_VERSION_MAJOR} GREATER_EQUAL 6)
-    qt_add_executable(Unbender
-        MANUAL_FINALIZATION
-        ${PROJECT_SOURCES}
         GraphicsView.h GraphicsView.cpp
         FindCentreLine.h FindCentreLine.cpp
         MarkerItem.h MarkerItem.cpp
@@ -39,10 +33,13 @@ if(${QT_VERSION_MAJOR} GREATER_EQUAL 6)
         PathEditWidget.h PathEditWidget.cpp
         Sidebar.h Sidebar.cpp
 
+        ../pugixml-1.16/pugixml.cpp ../pugixml-1.16/pugiconfig.hpp ../pugixml-1.16/pugixml.hpp
+)
 
-
-
-
+if(${QT_VERSION_MAJOR} GREATER_EQUAL 6)
+    qt_add_executable(Unbender
+        MANUAL_FINALIZATION
+        ${PROJECT_SOURCES}
     )
 # Define target properties for Android with Qt 6 as:
 #    set_property(TARGET Unbender APPEND PROPERTY QT_ANDROID_PACKAGE_SOURCE_DIR
@@ -71,7 +68,7 @@ target_link_libraries(Unbender PRIVATE
 )
 
 
-target_include_directories(Unbender PRIVATE "c:/dev/opencv/build/include" )
+target_include_directories(Unbender PRIVATE "c:/dev/opencv/build/include" "../pugixml-1.16")
 
 
 # Qt for iOS sets MACOSX_BUNDLE_GUI_IDENTIFIER automatically since Qt 6.1.
