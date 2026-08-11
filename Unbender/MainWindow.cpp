@@ -136,6 +136,7 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent) , m_ui(new Ui::Mai
     connect(m_lastImage, &QAction::triggered, this, &MainWindow::lastImage);
     connect(m_nextImage, &QAction::triggered, this, &MainWindow::nextImage);
     connect(m_previousImage, &QAction::triggered, this, &MainWindow::previousImage);
+    connect(m_processImagesAction, &QAction::triggered, this, &MainWindow::processImages);
     connect(m_maskView, &GraphicsView::uiUpdateRequested, this, &MainWindow::updateUI);
 
     setWindowTitle("Unbender");
@@ -204,18 +205,47 @@ void MainWindow::openDocument()
         m_lastFileOpened = fileName;
         setWindowTitle(fileName);
         statusBar()->showMessage(fileName + " opened");
+        updateUI();
     }
 }
 
 std::string *MainWindow::readXMLFile(const std::string &inputPath)
 {
-    auto ReadAttributes = [](const pugi::xml_node& node) -> std::map<std::string, std::string>
+    auto readAttributes = [](const pugi::xml_node& node) -> std::map<std::string, std::string>
     {
         std::map<std::string, std::string> attrs;
         for (pugi::xml_attribute attr : node.attributes()) {
             attrs[attr.name()] = attr.value();
         }
         return attrs;
+    };
+
+    auto findMissingKeys = [](const auto& map, const auto& requiredKeys) {
+        std::vector<std::string> missing;
+        std::copy_if(requiredKeys.begin(), requiredKeys.end(),
+                     std::back_inserter(missing),
+                     [&map](const std::string& key) { return !map.contains(key); });
+        return missing;
+    };
+
+    auto join = [](const auto& container, const std::string& delimiter) {
+        if (container.empty()) return std::string{};
+        return std::accumulate(
+            std::next(container.begin()), container.end(),
+            std::string(*container.begin()),
+            [&delimiter](const std::string& acc, const auto& item) {
+                return acc + delimiter + std::string(item);
+            });
+    };
+
+    auto stringToIntOr = [](const std::string& str, int defaultValue) {
+        int value{};
+        auto result = std::from_chars(str.data(), str.data() + str.size(), value);
+
+        if (result.ec == std::errc{} && result.ptr == str.data() + str.size()) {
+            return value;
+        }
+        return defaultValue;
     };
 
     pugi::xml_document doc;
@@ -234,27 +264,61 @@ std::string *MainWindow::readXMLFile(const std::string &inputPath)
     }
 
     m_globalData.clear();
-    m_imageData.clear();
+    m_imageDataList.clear();
+    m_imageSetList.clear();
+    m_imageSetListIndex = -1;
 
     pugi::xml_node globalNode = root.child("GLOBAL");
     if (globalNode)
     {
-        m_globalData = ReadAttributes(globalNode);
+        m_globalData = readAttributes(globalNode);
     }
     else
     {
         m_lastError = "Error: no <GLOBAL> element found"s;
         return &m_lastError;
     }
+    auto missingGlobalKeys = findMissingKeys(m_globalData, std::vector<std::string>{"InputFramesFolder"s, "InputMasksFolder"s, "OutputImagesFolder"s, "OutputMeshesFolder"s, "Threshold"s});
+    if (missingGlobalKeys.size())
+    {
+        m_lastError = "Error: GLOBAL missing atrributes: "s + join(missingGlobalKeys, ", "s);
+        return &m_lastError;
+    }
 
     for (pugi::xml_node imageNode = root.child("IMAGE"); imageNode; imageNode = imageNode.next_sibling("IMAGE"))
     {
-        m_imageData.push_back(ReadAttributes(imageNode));
+        m_imageDataList.push_back(readAttributes(imageNode));
     }
-    if (m_imageData.size() == 0)
+    if (m_imageDataList.size() == 0)
     {
         m_lastError = "Error: no <IMAGE> elements found"s;
         return &m_lastError;
+    }
+
+    m_sidebar->pathEditWidget("framesFolder")->setPath(QString::fromStdString(m_globalData["InputFramesFolder"s]));
+    m_sidebar->pathEditWidget("masksFolder")->setPath(QString::fromStdString(m_globalData["InputMasksFolder"s]));
+    m_sidebar->pathEditWidget("outputImageFolder")->setPath(QString::fromStdString(m_globalData["OutputImagesFolder"s]));
+    m_sidebar->pathEditWidget("outputMeshFolder")->setPath(QString::fromStdString(m_globalData["OutputMeshesFolder"s]));
+    m_sidebar->spinBox("outputMeshFolder")->setValue(stringToIntOr(m_globalData["Threshold"s], 127));
+
+        QFileInfo framesFolderInfo(m_sidebar->pathEditWidget("framesFolder")->path());
+    // QFileInfo masksFolderInfo(m_sidebar->pathEditWidget("masksFolder")->path());
+    // QFileInfo outputImageFolderInfo(m_sidebar->pathEditWidget("outputImageFolder")->path());
+    // QFileInfo outputMeshFolderInfo(m_sidebar->pathEditWidget("outputMeshFolder")->path());
+
+    for (size_t i = 0; i < m_imageDataList.size(); ++i)
+    {
+        auto missingImageKeys = findMissingKeys(m_imageDataList[i], std::vector<std::string>{"Frame"s, "Mask"s, "Point1"s, "Point2"s});
+        if (missingImageKeys.size())
+        {
+            m_lastError = "Error: IMAGE #" + std::to_string(i) + " missing atrributes: "s + join(missingImageKeys, ", "s);
+            return &m_lastError;
+        }
+        std::unique_ptr<ImageSet> imageSet = std::make_unique<ImageSet>();
+        imageSet->frameImagePath = QString::fromStdString(m_imageDataList[i]["Frame"s]);
+        imageSet->maskImagePath = QString::fromStdString(m_imageDataList[i]["Mask"s]);
+        imageSet->frameImagePath = QString::fromStdString(m_imageDataList[i]["Frame"s]);
+        imageSet->frameImagePath = QString::fromStdString(m_imageDataList[i]["Frame"s]);
     }
 
     m_lastError.clear();
@@ -276,7 +340,7 @@ std::string *MainWindow::writeXMLFile(const std::string &outputPath)
     pugi::xml_node outGlobal = outRoot.append_child("GLOBAL");
     WriteAttributes(outGlobal, m_globalData);
 
-    for (const auto& image : m_imageData)
+    for (const auto& image : m_imageDataList)
     {
         pugi::xml_node outImage = outRoot.append_child("IMAGE");
         WriteAttributes(outImage, image);
@@ -297,6 +361,7 @@ void MainWindow::saveDocument()
     updateUI();
 }
 
+/*
 void MainWindow::processImages()
 {
     auto parseDoubleList = [](const std::string &str) -> std::vector<double> {
@@ -391,7 +456,30 @@ void MainWindow::processImages()
 
     }
 }
+*/
 
+void MainWindow::processImages()
+{
+    // for (auto &&imageSet : m_imageSetList)
+    // {
+    //     if (imageSet->frameImage.isNull()) imageSet->frameImage = readImageEndednessIndependent(imageSet->frameImagePath);
+    //     m_frameView->setImage(new QPixmap::fromImage(imageSet->frameImage));
+    //     if (imageSet->maskImage.isNull()) imageSet->maskImage = readImageEndednessIndependent(imageSet->maskImagePath);
+
+
+    //     imageSet->maskImage = readImageEndednessIndependent(imageSet->imageSet->frameImage);
+    //     QImage maskImage;
+    //     QImage outputImage;
+    //     OpenCVTools::Mesh outputMesh;
+    //     QString frameImagePath;
+    //     QString maskImagePath;
+    //     QString outputImagePath;
+    //     QString outputMeshPath;
+    //     cv::Point2f pStart = {-1.f, -1.f};
+    //     cv::Point2f pEnd = {-1.f, -1.f};
+    //     FindCentreLine findCentreLine;
+    // }
+}
 
 void MainWindow::straighten()
 {
@@ -451,7 +539,7 @@ void MainWindow::straighten()
     imageSet->outputMesh = OpenCVTools::Mesh();
     m_meshView->setMeshes({imageSet->outputMesh});
 
-    imageSet->findCentreLine = *m_findCentreLine;
+    imageSet->findCentreLine = std::move(m_findCentreLine);
     updateUI();
 }
 
@@ -488,7 +576,7 @@ void MainWindow::straightenMore()
     m_processedView->addExtraItem(item);
 
     m_findCentreLine->createStraightVersion();
-    imageSet->findCentreLine = *m_findCentreLine;
+    imageSet->findCentreLine = std::move(m_findCentreLine);
     updateUI();
 }
 
@@ -507,34 +595,40 @@ void MainWindow::createMesh()
 
 void MainWindow::updateUI()
 {
-    const ImageSet *imageSet;
-    const static ImageSet nullImageSet;
-    if (m_imageSetListIndex >= 0) imageSet = m_imageSetList[m_imageSetListIndex].get();
-    else imageSet = &nullImageSet;
-    QFileInfo framesFolderInfo(m_sidebar->pathEditWidget("framesFolder")->path());
-    QFileInfo masksFolderInfo(m_sidebar->pathEditWidget("masksFolder")->path());
-    QFileInfo outputImageFolderInfo(m_sidebar->pathEditWidget("outputImageFolder")->path());
-    QFileInfo outputMeshFolderInfo(m_sidebar->pathEditWidget("outputMeshFolder")->path());
-    m_framesFolderValid = framesFolderInfo.isDir() && framesFolderInfo.isReadable();
-    m_masksFolderValid = masksFolderInfo.isDir() && masksFolderInfo.isReadable() && masksFolderInfo.isWritable();
-    m_outputImageFolderValid = outputImageFolderInfo.isDir() && outputImageFolderInfo.isReadable() && outputImageFolderInfo.isWritable();
-    m_outputMeshFolderValid = outputMeshFolderInfo.isDir() && outputMeshFolderInfo.isReadable() && outputMeshFolderInfo.isWritable();
-    m_straightenAction->setEnabled(m_framesFolderValid && m_masksFolderValid && m_outputImageFolderValid && m_outputMeshFolderValid &&
-                                   !imageSet->maskImage.isNull() &&  m_maskView->position1() && m_maskView->position2());
-    m_straightenMoreAction->setEnabled(m_framesFolderValid && m_masksFolderValid && m_outputImageFolderValid && m_outputMeshFolderValid &&
-                                       !imageSet->maskImage.isNull() && !imageSet->outputImage.isNull() && m_findCentreLine &&
-                                       m_maskView->position1() && m_maskView->position2());
-    m_createMeshAction->setEnabled(m_framesFolderValid && m_masksFolderValid && m_outputImageFolderValid && m_outputMeshFolderValid &&
-                                       !imageSet->maskImage.isNull() && !imageSet->outputImage.isNull() && m_findCentreLine &&
-                                       m_maskView->position1() && m_maskView->position2() && m_findCentreLine->straightMesh().triangles.size());
-    m_firstImage->setEnabled(m_framesFolderValid && m_masksFolderValid && m_outputImageFolderValid && m_outputMeshFolderValid &&
-                             m_imageSetList.size() > 0 && m_imageSetListIndex > 0);
-    m_previousImage->setEnabled(m_framesFolderValid && m_masksFolderValid && m_outputImageFolderValid && m_outputMeshFolderValid &&
-                                m_imageSetList.size() > 0 && m_imageSetListIndex > 0);
-    m_nextImage->setEnabled(m_framesFolderValid && m_masksFolderValid && m_outputImageFolderValid && m_outputMeshFolderValid &&
-                            m_imageSetList.size() > 0 && m_imageSetListIndex < m_imageSetList.size() - 1);
-    m_lastImage->setEnabled(m_framesFolderValid && m_masksFolderValid && m_outputImageFolderValid && m_outputMeshFolderValid &&
-                            m_imageSetList.size() > 0 && m_imageSetListIndex < m_imageSetList.size() - 1);
+    // const ImageSet *imageSet;
+    // const static ImageSet nullImageSet;
+    // if (m_imageSetListIndex >= 0) imageSet = m_imageSetList[m_imageSetListIndex].get();
+    // else imageSet = &nullImageSet;
+    // QFileInfo framesFolderInfo(m_sidebar->pathEditWidget("framesFolder")->path());
+    // QFileInfo masksFolderInfo(m_sidebar->pathEditWidget("masksFolder")->path());
+    // QFileInfo outputImageFolderInfo(m_sidebar->pathEditWidget("outputImageFolder")->path());
+    // QFileInfo outputMeshFolderInfo(m_sidebar->pathEditWidget("outputMeshFolder")->path());
+    // m_framesFolderValid = framesFolderInfo.isDir() && framesFolderInfo.isReadable();
+    // m_masksFolderValid = masksFolderInfo.isDir() && masksFolderInfo.isReadable() && masksFolderInfo.isWritable();
+    // m_outputImageFolderValid = outputImageFolderInfo.isDir() && outputImageFolderInfo.isReadable() && outputImageFolderInfo.isWritable();
+    // m_outputMeshFolderValid = outputMeshFolderInfo.isDir() && outputMeshFolderInfo.isReadable() && outputMeshFolderInfo.isWritable();
+    // m_straightenAction->setEnabled(m_framesFolderValid && m_masksFolderValid && m_outputImageFolderValid && m_outputMeshFolderValid &&
+    //                                !imageSet->maskImage.isNull() &&  m_maskView->position1() && m_maskView->position2());
+    // m_straightenMoreAction->setEnabled(m_framesFolderValid && m_masksFolderValid && m_outputImageFolderValid && m_outputMeshFolderValid &&
+    //                                    !imageSet->maskImage.isNull() && !imageSet->outputImage.isNull() && m_findCentreLine &&
+    //                                    m_maskView->position1() && m_maskView->position2());
+    // m_createMeshAction->setEnabled(m_framesFolderValid && m_masksFolderValid && m_outputImageFolderValid && m_outputMeshFolderValid &&
+    //                                    !imageSet->maskImage.isNull() && !imageSet->outputImage.isNull() && m_findCentreLine &&
+    //                                    m_maskView->position1() && m_maskView->position2() && m_findCentreLine->straightMesh().triangles.size());
+    // m_firstImage->setEnabled(m_framesFolderValid && m_masksFolderValid && m_outputImageFolderValid && m_outputMeshFolderValid &&
+    //                          m_imageSetList.size() > 0 && m_imageSetListIndex > 0);
+    // m_previousImage->setEnabled(m_framesFolderValid && m_masksFolderValid && m_outputImageFolderValid && m_outputMeshFolderValid &&
+    //                             m_imageSetList.size() > 0 && m_imageSetListIndex > 0);
+    // m_nextImage->setEnabled(m_framesFolderValid && m_masksFolderValid && m_outputImageFolderValid && m_outputMeshFolderValid &&
+    //                         m_imageSetList.size() > 0 && m_imageSetListIndex < m_imageSetList.size() - 1);
+    // m_lastImage->setEnabled(m_framesFolderValid && m_masksFolderValid && m_outputImageFolderValid && m_outputMeshFolderValid &&
+    //                         m_imageSetList.size() > 0 && m_imageSetListIndex < m_imageSetList.size() - 1);
+    m_straightenAction->setEnabled(m_imageSetList.size() > 0);
+    m_straightenMoreAction->setEnabled(m_imageSetList.size() > 0);
+    m_firstImage->setEnabled(m_imageSetList.size() > 0 && m_imageSetListIndex > 0);
+    m_previousImage->setEnabled(m_imageSetList.size() > 0 && m_imageSetListIndex > 0);
+    m_nextImage->setEnabled(m_imageSetList.size() > 0 && m_imageSetListIndex < m_imageSetList.size() - 1);
+    m_lastImage->setEnabled(m_imageSetList.size() > 0 && m_imageSetListIndex < m_imageSetList.size() - 1);
 }
 
 void MainWindow::readSettings()

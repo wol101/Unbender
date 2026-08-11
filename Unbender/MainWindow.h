@@ -82,7 +82,7 @@ private:
         QString outputMeshPath;
         cv::Point2f pStart = {-1.f, -1.f};
         cv::Point2f pEnd = {-1.f, -1.f};
-        FindCentreLine findCentreLine;
+        std::unique_ptr<FindCentreLine> findCentreLine;
     };
     std::vector<std::unique_ptr<ImageSet>> m_imageSetList;
     int m_imageSetListIndex = -1;
@@ -106,7 +106,7 @@ private:
     std::string *writeXMLFile(const std::string &outputPath);
     std::string m_lastError;
     std::map<std::string, std::string> m_globalData;
-    std::vector<std::map<std::string, std::string>> m_imageData;
+    std::vector<std::map<std::string, std::string>> m_imageDataList;
 
 };
 #endif // MAINWINDOW_H
